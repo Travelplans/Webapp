@@ -48,24 +48,57 @@ export const DataProvider: React.FC<DataProviderProps> = ({ children }) => {
   useEffect(() => {
     setLoading(true);
 
+    let hasFired = {
+      users: false,
+      itineraries: false,
+      customers: false,
+      bookings: false,
+    };
+
+    const checkLoadingComplete = () => {
+      // If all subscriptions have fired at least once, set loading to false
+      if (hasFired.users && hasFired.itineraries && hasFired.customers && hasFired.bookings) {
+        setLoading(false);
+      }
+    };
+
     const unsubscribeUsers = firestoreService.subscribeToUsers((updatedUsers) => {
       setUsers(updatedUsers);
+      if (!hasFired.users) {
+        hasFired.users = true;
+        checkLoadingComplete();
+      }
     });
 
     const unsubscribeItineraries = firestoreService.subscribeToItineraries((updatedItineraries) => {
       setItineraries(updatedItineraries);
+      if (!hasFired.itineraries) {
+        hasFired.itineraries = true;
+        checkLoadingComplete();
+      }
     });
 
     const unsubscribeCustomers = firestoreService.subscribeToCustomers((updatedCustomers) => {
       setCustomers(updatedCustomers);
+      if (!hasFired.customers) {
+        hasFired.customers = true;
+        checkLoadingComplete();
+      }
     });
 
     const unsubscribeBookings = firestoreService.subscribeToBookings((updatedBookings) => {
       setBookings(updatedBookings);
+      if (!hasFired.bookings) {
+        hasFired.bookings = true;
+        checkLoadingComplete();
+      }
     });
 
-    // Set loading to false after initial data is loaded
-    const timer = setTimeout(() => setLoading(false), 1000);
+    // Fallback: Set loading to false after max 1 second to prevent blocking
+    // This ensures pages render even if subscriptions are slow
+    const fallbackTimer = setTimeout(() => {
+      setLoading(false);
+    }, 1000);
 
     // Cleanup subscriptions on unmount
     return () => {
@@ -73,7 +106,7 @@ export const DataProvider: React.FC<DataProviderProps> = ({ children }) => {
       unsubscribeItineraries();
       unsubscribeCustomers();
       unsubscribeBookings();
-      clearTimeout(timer);
+      clearTimeout(fallbackTimer);
     };
   }, []);
 

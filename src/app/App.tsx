@@ -34,7 +34,8 @@ const AppRoutes: React.FC = () => {
   const { isAuthenticated, user, loading: authLoading } = useAuth();
   const { loading: dataLoading } = useData();
 
-  if (authLoading || dataLoading) {
+  // Only show loading spinner for auth, not data (data can load in background)
+  if (authLoading) {
     return <LoadingSpinner />;
   }
 

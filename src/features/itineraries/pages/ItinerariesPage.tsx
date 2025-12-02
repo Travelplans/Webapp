@@ -25,7 +25,7 @@ const ItinerariesPage: React.FC = () => {
   const [itineraryToDelete, setItineraryToDelete] = useState<Itinerary | null>(null);
   
   const isAdmin = user?.roles.includes(UserRole.ADMIN);
-  const canCreateItinerary = hasPermission(user, Permission.CREATE_ITINERARY);
+  const canCreateItinerary = isAdmin || hasPermission(user, Permission.CREATE_ITINERARY);
 
   const filteredItineraries = useMemo(() => {
     return itineraries.filter(itinerary =>

@@ -9,6 +9,8 @@ const SYSTEM_ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
   [UserRole.ADMIN]: Object.values(Permission), // Admin has all permissions
   [UserRole.AGENT]: [
     Permission.VIEW_ITINERARY,
+    Permission.CREATE_ITINERARY,
+    Permission.EDIT_ITINERARY,
     Permission.VIEW_CUSTOMER,
     Permission.CREATE_CUSTOMER,
     Permission.EDIT_CUSTOMER,
@@ -17,6 +19,7 @@ const SYSTEM_ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
     Permission.EDIT_BOOKING,
     Permission.VIEW_DASHBOARD,
     Permission.USE_AI_CHAT,
+    Permission.GENERATE_ITINERARY,
     Permission.VIEW_DOCUMENT,
     Permission.UPLOAD_DOCUMENT,
   ],
