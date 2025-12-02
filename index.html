@@ -10,36 +10,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Amaranth:ital,wght@0,400;0,700;1,400;1,700&display=swap" rel="stylesheet">
 
-  <!-- Tailwind CSS -->
-  <script src="https://cdn.tailwindcss.com"></script>
-  <script>
-    tailwind.config = {
-      theme: {
-        extend: {
-          fontFamily: {
-            sans: ['Amaranth', 'sans-serif'],
-          },
-          colors: {
-            primary: '#00A9E0', // New theme blue from logo
-            'primary-dark': '#0087B3',
-            secondary: '#8CC63F', // New theme green from logo
-            accent: '#F7941D', // New theme orange from logo
-            sidebar: '#F9FAFB', // Light gray for new sidebar theme
-            'sidebar-accent': '#E5E7EB', // Slightly darker for hover/active
-          },
-          keyframes: {
-            'toast-in': {
-              '0%': { transform: 'translateX(100%)', opacity: '0' },
-              '100%': { transform: 'translateX(0)', opacity: '1' },
-            },
-          },
-          animation: {
-            'toast-in': 'toast-in 0.5s ease-out forwards',
-          }
-        }
-      }
-    }
-  </script>
+  <!-- Tailwind CSS is configured via PostCSS and tailwind.config.js -->
 <script type="importmap">
 {
   "imports": {

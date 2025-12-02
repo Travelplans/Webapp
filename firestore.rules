@@ -53,5 +53,13 @@ service cloud.firestore {
       allow read: if isAuthenticated();
       allow write: if isAdmin() || isAgent() || (isAuthenticated() && resource.data.customerId == request.auth.uid);
     }
+
+    // Custom Roles collection (for RBAC)
+    match /customRoles/{roleId} {
+      allow read: if isAuthenticated();
+      allow create: if isAdmin();
+      allow update: if isAdmin();
+      allow delete: if isAdmin() && (!exists(/databases/$(database)/documents/customRoles/$(roleId)) || !get(/databases/$(database)/documents/customRoles/$(roleId)).data.isSystemRole);
+    }
   }
 }
