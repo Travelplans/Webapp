@@ -59,7 +59,10 @@ service cloud.firestore {
       allow read: if isAuthenticated();
       allow create: if isAdmin();
       allow update: if isAdmin();
-      allow delete: if isAdmin() && (!exists(/databases/$(database)/documents/customRoles/$(roleId)) || !get(/databases/$(database)/documents/customRoles/$(roleId)).data.isSystemRole);
+      // Only allow delete if the role exists and is not a system role
+      allow delete: if isAdmin() && 
+        exists(/databases/$(database)/documents/customRoles/$(roleId)) &&
+        (!resource.data.isSystemRole || resource.data.isSystemRole == false);
     }
   }
 }
