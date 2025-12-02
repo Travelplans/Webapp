@@ -80,10 +80,10 @@ const ItinerariesPage: React.FC = () => {
 
   return (
     <DashboardLayout>
-      <div className="space-y-6">
-        <div className="md:flex justify-between items-center">
-          <h1 className="text-3xl font-bold text-gray-800">Manage Itineraries</h1>
-          {canCreateItinerary && <Button onClick={handleOpenCreateModal} className="mt-4 md:mt-0">Create New Itinerary</Button>}
+      <div className="space-y-4 sm:space-y-6">
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 sm:gap-0">
+          <h1 className="text-2xl sm:text-3xl font-bold text-gray-800">Manage Itineraries</h1>
+          {canCreateItinerary && <Button onClick={handleOpenCreateModal} className="w-full sm:w-auto">Create New Itinerary</Button>}
         </div>
 
         <Card>
@@ -98,7 +98,7 @@ const ItinerariesPage: React.FC = () => {
           </div>
 
           {filteredItineraries.length > 0 ? (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
               {filteredItineraries.map(it => (
                 <Card key={it.id} className="overflow-hidden !p-0 flex flex-col group h-full">
                   <div className="relative">
