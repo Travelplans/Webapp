@@ -46,13 +46,22 @@ const timestampToString = (timestamp: any): string => {
 
 export const subscribeToUsers = (callback: (users: User[]) => void): Unsubscribe => {
     const usersRef = collection(db, COLLECTIONS.USERS);
-    return onSnapshot(usersRef, (snapshot: QuerySnapshot<DocumentData>) => {
-        const users = snapshot.docs.map(doc => ({
-            id: doc.id,
-            ...doc.data(),
-        })) as User[];
-        callback(users);
-    });
+    return onSnapshot(
+        usersRef, 
+        (snapshot: QuerySnapshot<DocumentData>) => {
+            const users = snapshot.docs.map(doc => ({
+                id: doc.id,
+                ...doc.data(),
+            })) as User[];
+            callback(users);
+        },
+        (error) => {
+            if (error.code !== 'permission-denied') {
+                console.error('Error subscribing to users:', error);
+            }
+            callback([]);
+        }
+    );
 };
 
 export const addUser = async (user: Omit<User, 'id'>): Promise<string> => {
@@ -164,19 +173,28 @@ export const deleteCollateral = async (
 
 export const subscribeToCustomers = (callback: (customers: Customer[]) => void): Unsubscribe => {
     const customersRef = collection(db, COLLECTIONS.CUSTOMERS);
-    return onSnapshot(customersRef, (snapshot: QuerySnapshot<DocumentData>) => {
-        const customers = snapshot.docs.map(doc => {
-            const data = doc.data();
-            return {
-                id: doc.id,
-                ...data,
-                registrationDate: timestampToString(data.registrationDate),
-                dob: timestampToString(data.dob),
-                documents: data.documents || [],
-            };
-        }) as Customer[];
-        callback(customers);
-    });
+    return onSnapshot(
+        customersRef, 
+        (snapshot: QuerySnapshot<DocumentData>) => {
+            const customers = snapshot.docs.map(doc => {
+                const data = doc.data();
+                return {
+                    id: doc.id,
+                    ...data,
+                    registrationDate: timestampToString(data.registrationDate),
+                    dob: timestampToString(data.dob),
+                    documents: data.documents || [],
+                };
+            }) as Customer[];
+            callback(customers);
+        },
+        (error) => {
+            if (error.code !== 'permission-denied') {
+                console.error('Error subscribing to customers:', error);
+            }
+            callback([]);
+        }
+    );
 };
 
 export const addCustomer = async (
@@ -264,17 +282,26 @@ export const updateCustomerDocument = async (
 
 export const subscribeToBookings = (callback: (bookings: Booking[]) => void): Unsubscribe => {
     const bookingsRef = collection(db, COLLECTIONS.BOOKINGS);
-    return onSnapshot(bookingsRef, (snapshot: QuerySnapshot<DocumentData>) => {
-        const bookings = snapshot.docs.map(doc => {
-            const data = doc.data();
-            return {
-                id: doc.id,
-                ...data,
-                bookingDate: timestampToString(data.bookingDate),
-            };
-        }) as Booking[];
-        callback(bookings);
-    });
+    return onSnapshot(
+        bookingsRef, 
+        (snapshot: QuerySnapshot<DocumentData>) => {
+            const bookings = snapshot.docs.map(doc => {
+                const data = doc.data();
+                return {
+                    id: doc.id,
+                    ...data,
+                    bookingDate: timestampToString(data.bookingDate),
+                };
+            }) as Booking[];
+            callback(bookings);
+        },
+        (error) => {
+            if (error.code !== 'permission-denied') {
+                console.error('Error subscribing to bookings:', error);
+            }
+            callback([]);
+        }
+    );
 };
 
 export const addBooking = async (
