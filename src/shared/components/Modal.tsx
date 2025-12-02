@@ -12,24 +12,36 @@ const Modal: React.FC<ModalProps> = ({ isOpen, onClose, title, children }) => {
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 overflow-y-auto" aria-labelledby="modal-title" role="dialog" aria-modal="true">
-      <div className="flex items-end justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
-        <div className="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity" aria-hidden="true" onClick={onClose}></div>
+    <div 
+      className="fixed inset-0 z-50 overflow-y-auto" 
+      aria-labelledby="modal-title" 
+      role="dialog" 
+      aria-modal="true"
+      style={{ zIndex: 9999 }}
+    >
+      {/* Backdrop */}
+      <div 
+        className="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity" 
+        aria-hidden="true" 
+        onClick={onClose}
+      ></div>
 
-        <span className="hidden sm:inline-block sm:align-middle sm:h-screen" aria-hidden="true">&#8203;</span>
+      {/* Modal Container */}
+      <div className="flex min-h-full items-center justify-center p-4 text-center sm:p-0">
+        <div 
+          className="relative transform overflow-hidden rounded-lg bg-white text-left shadow-xl transition-all sm:my-8 sm:w-full sm:max-w-4xl"
+          style={{ maxHeight: '90vh', display: 'flex', flexDirection: 'column' }}
+        >
+          {/* Modal Header */}
+          <div className="bg-white px-4 pt-5 pb-2 sm:px-6 sm:pt-6 sm:pb-4 border-b border-gray-200 flex-shrink-0">
+            <h3 className="text-lg font-semibold leading-6 text-gray-900" id="modal-title">
+              {title}
+            </h3>
+          </div>
 
-        <div className="inline-block align-bottom bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-4xl sm:w-full max-h-[90vh] overflow-y-auto">
-          <div className="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
-            <div className="sm:flex sm:items-start">
-              <div className="mt-3 text-center sm:mt-0 sm:ml-4 sm:text-left w-full">
-                <h3 className="text-lg leading-6 font-medium text-gray-900 mb-4" id="modal-title">
-                  {title}
-                </h3>
-                <div className="mt-4">
-                  {children}
-                </div>
-              </div>
-            </div>
+          {/* Modal Content - Scrollable */}
+          <div className="bg-white px-4 pb-4 sm:px-6 sm:pb-6 overflow-y-auto flex-1" style={{ maxHeight: 'calc(90vh - 100px)' }}>
+            {children}
           </div>
         </div>
       </div>
