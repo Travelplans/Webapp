@@ -1,0 +1,57 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // Helper functions
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+    
+    function isAdmin() {
+      return isAuthenticated() && 
+        exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.roles.hasAny(['Admin']);
+    }
+    
+    function isAgent() {
+      return isAuthenticated() && 
+        exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.roles.hasAny(['Agent']);
+    }
+
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    // Users collection
+    match /users/{userId} {
+      allow read: if isAuthenticated();
+      // Allow users to create their own document (for initial signup)
+      // This is critical for new users who don't have a document yet
+      allow create: if isAuthenticated() && request.auth.uid == userId;
+      // Allow users to update their own document
+      // Allow admins to update any user document (but only if admin doc exists)
+      allow update: if isAuthenticated() && (request.auth.uid == userId || isAdmin());
+      // Only admins can delete user documents
+      allow delete: if isAdmin();
+    }
+
+    // Itineraries collection
+    match /itineraries/{itineraryId} {
+      allow read: if isAuthenticated();
+      allow write: if isAdmin() || isAgent();
+    }
+
+    // Customers collection
+    match /customers/{customerId} {
+      allow read: if isAuthenticated();
+      allow write: if isAdmin() || isAgent();
+    }
+
+    // Bookings collection
+    match /bookings/{bookingId} {
+      allow read: if isAuthenticated();
+      allow write: if isAdmin() || isAgent() || (isAuthenticated() && resource.data.customerId == request.auth.uid);
+    }
+  }
+}

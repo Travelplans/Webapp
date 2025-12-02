@@ -1,0 +1,5 @@
+{
+  "name": "Travelplans.fun",
+  "description": "A scalable, secure, role-based portal for Travelplans.fun to manage itineraries, customers, and agents, with analytics and document management features.",
+  "requestFramePermissions": []
+}
