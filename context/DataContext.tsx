@@ -1,4 +1,4 @@
-import React, { createContext, useState, useEffect, ReactNode } from 'react';
+import React, { createContext, useState, useEffect, useRef, ReactNode } from 'react';
 import { User, Itinerary, Customer, Booking, ItineraryCollateral, CustomerDocument, RecommendedItinerary } from '../types';
 import * as firestoreService from '../services/firestoreService';
 
@@ -43,29 +43,59 @@ export const DataProvider: React.FC<DataProviderProps> = ({ children }) => {
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [loading, setLoading] = useState(true);
+  const initialLoadFlags = useRef({ users: false, itineraries: false, customers: false, bookings: false });
 
   // Subscribe to real-time Firestore updates
   useEffect(() => {
     setLoading(true);
+    // Reset flags when component mounts
+    initialLoadFlags.current = { users: false, itineraries: false, customers: false, bookings: false };
+
+    const checkAllLoaded = () => {
+      if (initialLoadFlags.current.users && 
+          initialLoadFlags.current.itineraries && 
+          initialLoadFlags.current.customers && 
+          initialLoadFlags.current.bookings) {
+        setLoading(false);
+      }
+    };
 
     const unsubscribeUsers = firestoreService.subscribeToUsers((updatedUsers) => {
       setUsers(updatedUsers);
+      if (!initialLoadFlags.current.users) {
+        initialLoadFlags.current.users = true;
+        checkAllLoaded();
+      }
     });
 
     const unsubscribeItineraries = firestoreService.subscribeToItineraries((updatedItineraries) => {
       setItineraries(updatedItineraries);
+      if (!initialLoadFlags.current.itineraries) {
+        initialLoadFlags.current.itineraries = true;
+        checkAllLoaded();
+      }
     });
 
     const unsubscribeCustomers = firestoreService.subscribeToCustomers((updatedCustomers) => {
       setCustomers(updatedCustomers);
+      if (!initialLoadFlags.current.customers) {
+        initialLoadFlags.current.customers = true;
+        checkAllLoaded();
+      }
     });
 
     const unsubscribeBookings = firestoreService.subscribeToBookings((updatedBookings) => {
       setBookings(updatedBookings);
+      if (!initialLoadFlags.current.bookings) {
+        initialLoadFlags.current.bookings = true;
+        checkAllLoaded();
+      }
     });
 
-    // Set loading to false after initial data is loaded
-    const timer = setTimeout(() => setLoading(false), 1000);
+    // Fallback: Set loading to false after 3 seconds even if some subscriptions haven't fired
+    const timer = setTimeout(() => {
+      setLoading(false);
+    }, 3000);
 
     // Cleanup subscriptions on unmount
     return () => {

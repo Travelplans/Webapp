@@ -3,8 +3,8 @@ import { Itinerary, UserRole, ItineraryCollateral, CollateralType } from '../../
 import { useData } from '../../hooks/useData';
 import Button from '../shared/Button';
 import { ImageIcon, DeleteIcon, FilePlusIcon, SparklesIcon } from '../shared/icons/Icons';
-import { GoogleGenAI } from "@google/genai";
 import { useToast } from '../../hooks/useToast';
+import { generateImage } from '../../src/services/api/aiService';
 
 // Helper function to convert file to Base64 data URL
 const toBase64 = (file: File): Promise<string> => new Promise((resolve, reject) => {
@@ -107,29 +107,16 @@ const ItineraryForm: React.FC<ItineraryFormProps> = ({ onClose, onSubmit, itiner
     
     setIsGenerating(true);
     try {
-      const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-      const response = await ai.models.generateImages({
-        model: 'imagen-4.0-generate-001',
+      const imageResponse = await generateImage({
         prompt: aiPrompt,
-        config: {
-          numberOfImages: 1,
-          outputMimeType: 'image/jpeg',
-          aspectRatio: '16:9',
-        },
       });
 
-      if (response.generatedImages?.length > 0) {
-        const base64ImageBytes: string = response.generatedImages[0].image.imageBytes;
-        const dataUrl = `data:image/jpeg;base64,${base64ImageBytes}`;
-        setImageUrl(dataUrl);
-        setImagePreview(dataUrl);
-        addToast("Image generated successfully!", "success");
-      } else {
-        throw new Error("AI failed to return an image.");
-      }
+      setImageUrl(imageResponse.imageUrl);
+      setImagePreview(imageResponse.imageUrl);
+      addToast("Image generated successfully!", "success");
     } catch (error) {
       console.error("Image generation failed:", error);
-      addToast("Failed to generate image. Please try again.", "error");
+      addToast(error instanceof Error ? error.message : "Failed to generate image. Please try again.", "error");
     } finally {
       setIsGenerating(false);
     }
@@ -162,32 +149,71 @@ const ItineraryForm: React.FC<ItineraryFormProps> = ({ onClose, onSubmit, itiner
   const handleCollateralFileChange = async (e: React.ChangeEvent<HTMLInputElement>, index: number) => {
     if (e.target.files && e.target.files[0]) {
       const file = e.target.files[0];
-      const dataUrl = await toBase64(file);
-      const newCollaterals = [...collaterals];
-      newCollaterals[index] = { 
-          ...newCollaterals[index], 
-          url: dataUrl, 
-          name: newCollaterals[index].name || file.name 
-      };
-      setCollaterals(newCollaterals);
+      const fileInput = e.target;
+      
+      try {
+        const dataUrl = await toBase64(file);
+        const newCollaterals = [...collaterals];
+        newCollaterals[index] = { 
+            ...newCollaterals[index], 
+            url: dataUrl, 
+            name: newCollaterals[index].name || file.name,
+            approved: true // Set as approved/active when file is uploaded
+        };
+        setCollaterals(newCollaterals);
+        
+        // Reset file input to allow re-uploading
+        if (fileInput) {
+          fileInput.value = '';
+        }
+        
+        addToast(`File "${file.name}" uploaded successfully!`, 'success');
+      } catch (error) {
+        console.error('Error uploading file:', error);
+        // Reset file input on error too
+        if (fileInput) {
+          fileInput.value = '';
+        }
+        addToast('Failed to upload file. Please try again.', 'error');
+      }
     }
   };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    const itineraryData = {
-      ...(itineraryToEdit || {}),
-      id: itineraryToEdit?.id,
-      title,
-      destination,
-      duration,
-      price,
-      description,
-      imageUrl,
-      assignedAgentId,
-      collaterals,
-    };
-    onSubmit(itineraryData);
+    // Use default image if none provided
+    const finalImageUrl = imageUrl || 'https://images.unsplash.com/photo-1501785888041-af3ef285b470?q=80&w=2070';
+    
+    if (itineraryToEdit) {
+      // Editing existing itinerary
+      const itineraryData: Itinerary = {
+        id: itineraryToEdit.id,
+        title,
+        destination,
+        duration,
+        price,
+        description,
+        imageUrl: finalImageUrl,
+        assignedAgentId: assignedAgentId || undefined,
+        collaterals: collaterals || [],
+      };
+      onSubmit(itineraryData);
+    } else {
+      // Creating new itinerary - don't include id at all
+      const itineraryData: Omit<Itinerary, 'id'> = {
+        title,
+        destination,
+        duration,
+        price,
+        description,
+        imageUrl: finalImageUrl,
+        assignedAgentId: assignedAgentId || undefined,
+        collaterals: collaterals || [],
+      };
+      // Explicitly remove any id field that might be present
+      const { id, ...cleanData } = itineraryData as any;
+      onSubmit(cleanData as Omit<Itinerary, 'id'>);
+    }
   };
 
   return (

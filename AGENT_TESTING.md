@@ -80,3 +80,7 @@ If you encounter any issues:
 3. Check network tab for failed requests
 4. Ensure user document exists in Firestore with correct roles
 
+
+
+
+

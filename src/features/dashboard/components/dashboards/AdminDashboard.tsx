@@ -10,11 +10,11 @@ const AdminDashboard: React.FC = () => {
   const { users, itineraries } = useData();
 
   return (
-    <div className="space-y-8">
-      <h1 className="text-3xl font-bold text-gray-800">Admin Dashboard</h1>
+    <div className="space-y-4 sm:space-y-6 lg:space-y-8">
+      <h1 className="text-2xl sm:text-3xl font-bold text-gray-800">Admin Dashboard</h1>
       
       {/* Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6">
         <Card>
           <div className="flex items-center">
             <div className="p-3 rounded-full bg-blue-100 text-primary">
@@ -39,15 +39,33 @@ const AdminDashboard: React.FC = () => {
         </Card>
       </div>
 
+      {/* Quick Actions */}
+      <Card>
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 sm:gap-0">
+          <div>
+            <h2 className="text-lg sm:text-xl font-semibold text-gray-800">Quick Actions</h2>
+            <p className="text-xs sm:text-sm text-gray-500 mt-1">Common admin tools</p>
+          </div>
+          <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
+            <Link to="/settings" className="w-full sm:w-auto">
+              <Button className="w-full sm:w-auto">API Settings</Button>
+            </Link>
+            <Link to="/users" className="w-full sm:w-auto">
+              <Button variant="secondary" className="w-full sm:w-auto">Manage Users</Button>
+            </Link>
+          </div>
+        </div>
+      </Card>
+
       {/* Itinerary Management */}
       <Card>
-        <div className="flex justify-between items-center mb-4">
-          <h2 className="text-xl font-semibold text-gray-800">Recent Itineraries</h2>
-          <Link to="/itineraries">
-            <Button>Manage Itineraries</Button>
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 sm:gap-0 mb-4">
+          <h2 className="text-lg sm:text-xl font-semibold text-gray-800">Recent Itineraries</h2>
+          <Link to="/itineraries" className="w-full sm:w-auto">
+            <Button className="w-full sm:w-auto">Manage Itineraries</Button>
           </Link>
         </div>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
           {itineraries.slice(0, 3).map(it => (
             <Card key={it.id} className="overflow-hidden !p-0 flex flex-col h-full">
               <Link to={`/itinerary/${it.id}`} className="group block h-full flex flex-col">

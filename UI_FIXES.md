@@ -98,3 +98,7 @@ After deployment, verify:
 3. Check that Amaranth font is applied
 4. Verify no console errors
 
+
+
+
+

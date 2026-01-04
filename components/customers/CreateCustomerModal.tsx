@@ -26,24 +26,29 @@ const CreateCustomerModal: React.FC<CreateCustomerModalProps> = ({ isOpen, onClo
     setDob('');
   }
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!user) {
         addToast("You must be logged in to create a customer.", 'error');
         return;
     }
 
-    addCustomer({
-        firstName,
-        lastName,
-        email,
-        dob,
-        registeredByAgentId: user.id,
-    });
-    
-    addToast('Customer registered successfully!', 'success');
-    clearForm();
-    onClose();
+    try {
+      await addCustomer({
+          firstName,
+          lastName,
+          email,
+          dob,
+          registeredByAgentId: user.id,
+      });
+      
+      addToast('Customer registered successfully!', 'success');
+      clearForm();
+      onClose();
+    } catch (error) {
+      console.error('Error creating customer:', error);
+      addToast('Failed to create customer. Please try again.', 'error');
+    }
   };
   
   const handleClose = () => {

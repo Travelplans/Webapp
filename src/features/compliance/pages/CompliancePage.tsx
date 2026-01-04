@@ -27,16 +27,26 @@ const CompliancePage: React.FC = () => {
             .map(collateral => ({ ...collateral, itineraryTitle: itinerary.title, itineraryId: itinerary.id }))
     );
     
-    const handleApprove = (itineraryId: string, collateralId: string, collateralName: string) => {
-        updateCollateral(itineraryId, collateralId, { approved: true });
-        addToast(`"${collateralName}" has been approved.`, 'success');
+    const handleApprove = async (itineraryId: string, collateralId: string, collateralName: string) => {
+        try {
+            await updateCollateral(itineraryId, collateralId, { approved: true });
+            addToast(`"${collateralName}" has been approved.`, 'success');
+        } catch (error) {
+            console.error('Error approving collateral:', error);
+            addToast('Failed to approve collateral. Please try again.', 'error');
+        }
     };
     
-    const handleRejectConfirm = () => {
+    const handleRejectConfirm = async () => {
         if (collateralToReject) {
-            deleteCollateral(collateralToReject.itineraryId, collateralToReject.id);
-            addToast(`"${collateralToReject.name}" has been rejected and removed.`, 'success');
-            setCollateralToReject(null);
+            try {
+                await deleteCollateral(collateralToReject.itineraryId, collateralToReject.id);
+                addToast(`"${collateralToReject.name}" has been rejected and removed.`, 'success');
+                setCollateralToReject(null);
+            } catch (error) {
+                console.error('Error rejecting collateral:', error);
+                addToast('Failed to reject collateral. Please try again.', 'error');
+            }
         }
     };
 

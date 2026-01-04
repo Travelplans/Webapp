@@ -10,7 +10,10 @@ service cloud.firestore {
     function isAdmin() {
       return isAuthenticated() && 
         exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
-        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.roles.hasAny(['Admin']);
+        (
+          get(/databases/$(database)/documents/users/$(request.auth.uid)).data.roles.hasAny(['Admin']) ||
+          get(/databases/$(database)/documents/users/$(request.auth.uid)).data.roles.hasAny(['admin'])
+        );
     }
     
     function isAgent() {
@@ -27,19 +30,49 @@ service cloud.firestore {
     match /users/{userId} {
       allow read: if isAuthenticated();
       // Allow users to create their own document (for initial signup)
-      // This is critical for new users who don't have a document yet
-      allow create: if isAuthenticated() && request.auth.uid == userId;
+      // Allow admins to create user documents for new users
+      allow create: if isAuthenticated() && (request.auth.uid == userId || isAdmin());
       // Allow users to update their own document
       // Allow admins to update any user document (but only if admin doc exists)
       allow update: if isAuthenticated() && (request.auth.uid == userId || isAdmin());
       // Only admins can delete user documents
-      allow delete: if isAdmin();
+      // Prevent deletion of the primary admin account (mail@jsabu.com)
+      allow delete: if isAdmin() && 
+        (!resource.data.email || resource.data.email != 'mail@jsabu.com');
     }
 
     // Itineraries collection
     match /itineraries/{itineraryId} {
-      allow read: if isAuthenticated();
-      allow write: if isAdmin() || isAgent();
+      // Helper function to check if agent is assigned
+      function isAssignedAgent() {
+        return isAgent() && (
+          // Check new format (assignedAgentIds array)
+          (resource.data.assignedAgentIds != null && 
+           resource.data.assignedAgentIds.hasAny([request.auth.uid])) ||
+          // Check old format (assignedAgentId) for backward compatibility
+          (resource.data.assignedAgentId != null && 
+           resource.data.assignedAgentId == request.auth.uid)
+        );
+      }
+      
+      // Admins can read all itineraries
+      // Agents can only read itineraries assigned to them
+      // Other authenticated users can read all (for viewing)
+      allow read: if isAuthenticated() && (
+        isAdmin() || 
+        !isAgent() || 
+        isAssignedAgent()
+      );
+      
+      // Only admins can create itineraries
+      allow create: if isAdmin();
+      
+      // Admins can update any itinerary
+      // Agents can only update itineraries assigned to them
+      allow update: if isAdmin() || isAssignedAgent();
+      
+      // Only admins can delete itineraries
+      allow delete: if isAdmin();
     }
 
     // Customers collection
@@ -51,7 +84,20 @@ service cloud.firestore {
     // Bookings collection
     match /bookings/{bookingId} {
       allow read: if isAuthenticated();
-      allow write: if isAdmin() || isAgent() || (isAuthenticated() && resource.data.customerId == request.auth.uid);
+      // Allow customers to create bookings for themselves
+      // Allow admins and agents to create/update/delete any booking
+      allow create: if isAuthenticated() && (
+        isAdmin() || 
+        isAgent() || 
+        // Customer can create booking if the customerId exists and the customer's email matches the authenticated user's email
+        (request.resource.data.customerId != null && 
+         exists(/databases/$(database)/documents/customers/$(request.resource.data.customerId)) &&
+         get(/databases/$(database)/documents/customers/$(request.resource.data.customerId)).data.email == request.auth.token.email)
+      );
+      allow update, delete: if isAdmin() || isAgent() || 
+        (isAuthenticated() && resource.data.customerId != null &&
+         exists(/databases/$(database)/documents/customers/$(resource.data.customerId)) &&
+         get(/databases/$(database)/documents/customers/$(resource.data.customerId)).data.email == request.auth.token.email);
     }
 
     // Custom Roles collection (for RBAC)
@@ -63,6 +109,24 @@ service cloud.firestore {
       allow delete: if isAdmin() && 
         exists(/databases/$(database)/documents/customRoles/$(roleId)) &&
         (!resource.data.isSystemRole || resource.data.isSystemRole == false);
+    }
+
+    // System Roles collection (for RBAC)
+    match /systemRoles/{roleId} {
+      allow read: if isAuthenticated();
+      // Only admins can create/update system roles
+      // Prevent updating Admin role
+      allow create: if isAdmin();
+      allow update: if isAdmin() && 
+        (!resource.data.name || resource.data.name != 'Admin');
+      // System roles cannot be deleted
+      allow delete: if false;
+    }
+
+    // API Credentials collection (Admin only - secure storage)
+    match /apiCredentials/{docId} {
+      // Only admins can read/write API credentials
+      allow read, write: if isAdmin();
     }
   }
 }

@@ -115,9 +115,20 @@ export interface User {
   id: string;
   name: string;
   email: string;
+  countryCode: string; // Country code (e.g., "+971", "+1")
+  contactNumber: string; // Contact number without country code
+  useSameAsContact?: boolean; // If true, WhatsApp uses same number as contact
+  whatsappCountryCode?: string; // WhatsApp country code (if different from contact)
+  whatsappNumber?: string; // WhatsApp number without country code (if different from contact)
   roles: UserRole[];
   customRoles?: string[]; // IDs of custom roles
   permissions?: Permission[]; // Direct permissions (for flexibility)
+}
+
+export interface DailyPlan {
+  day: number;
+  title: string;
+  activities: string;
 }
 
 export interface Itinerary {
@@ -127,7 +138,9 @@ export interface Itinerary {
   duration: number; // in days
   price: number;
   description?: string;
-  assignedAgentId?: string;
+  dailyPlan?: DailyPlan[]; // Day-by-day breakdown for AI-generated itineraries
+  assignedAgentId?: string; // Deprecated: kept for backward compatibility
+  assignedAgentIds?: string[]; // New: supports multiple agents
   collaterals: ItineraryCollateral[];
   imageUrl: string;
 }

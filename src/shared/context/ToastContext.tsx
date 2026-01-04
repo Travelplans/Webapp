@@ -17,7 +17,7 @@ export const ToastContext = createContext<ToastContextType | undefined>(undefine
 
 const ToastContainer: React.FC<{ toasts: Toast[]; removeToast: (id: number) => void }> = ({ toasts, removeToast }) => {
   return (
-    <div className="fixed top-5 right-5 z-[100] w-full max-w-sm space-y-3">
+    <div className="fixed top-4 right-4 sm:top-5 sm:right-5 z-[100] w-[calc(100%-2rem)] sm:w-full max-w-sm space-y-2 sm:space-y-3 px-2 sm:px-0">
       {toasts.map((toast) => {
         let bgColor: string;
         let icon: React.ReactNode;
@@ -75,8 +75,32 @@ export const ToastProvider: React.FC<{ children: ReactNode }> = ({ children }) =
   }, []);
 
   const addToast = useCallback((message: string, type: ToastType) => {
+    // For error toasts, check error cache to suppress duplicates
+    if (type === 'error' && message) {
+      try {
+        // Dynamically import to avoid circular dependencies
+        const { cacheAndCheckError } = require('../utils/errorCache');
+        const tempError = new Error(message);
+        const { shouldShow } = cacheAndCheckError(tempError, message);
+        if (!shouldShow) {
+          // Suppress duplicate error toast
+          return;
+        }
+      } catch (e) {
+        // If error cache fails, continue with normal toast
+        console.warn('Error cache check failed:', e);
+      }
+    }
+
     const id = Date.now();
-    setToasts((prevToasts) => [...prevToasts, { id, message, type }]);
+    setToasts((prevToasts) => {
+      // Also check for duplicate messages in the current toast list (within last 2 seconds)
+      const recentToasts = prevToasts.filter(t => Date.now() - t.id < 2000);
+      if (recentToasts.some(t => t.message === message && t.type === type)) {
+        return prevToasts;
+      }
+      return [...prevToasts, { id, message, type }];
+    });
 
     setTimeout(() => {
       removeToast(id);

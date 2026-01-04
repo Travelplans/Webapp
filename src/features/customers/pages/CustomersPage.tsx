@@ -23,22 +23,35 @@ const CustomersPage: React.FC = () => {
   const canViewDetails = canManageCustomers || user?.roles.includes(UserRole.RELATIONSHIP_MANAGER);
 
   const customersWithDetails = useMemo(() => {
+    console.log('[CustomersPage] Computing customersWithDetails:', {
+      totalCustomers: customers.length,
+      userRoles: user?.roles,
+      isAdmin: user?.roles.includes(UserRole.ADMIN),
+      isAgent: user?.roles.includes(UserRole.AGENT),
+      isRM: user?.roles.includes(UserRole.RELATIONSHIP_MANAGER),
+      userId: user?.id
+    });
+    
     let baseCustomers: Customer[];
 
     // Role-based filtering with correct priority
     if (user?.roles.includes(UserRole.ADMIN)) {
         baseCustomers = customers;
+        console.log('[CustomersPage] Admin user - showing all', customers.length, 'customers');
     } else if (user?.roles.includes(UserRole.AGENT)) {
         // Agents see customers they registered.
         baseCustomers = customers.filter(c => c.registeredByAgentId === user.id);
+        console.log('[CustomersPage] Agent user - showing', baseCustomers.length, 'customers registered by agent');
     } else if (user?.roles.includes(UserRole.RELATIONSHIP_MANAGER)) {
         // RMs who are not Admins/Agents see assigned customers.
         baseCustomers = customers.filter(c => c.assignedRmId === user.id);
+        console.log('[CustomersPage] RM user - showing', baseCustomers.length, 'assigned customers');
     } else {
         baseCustomers = [];
+        console.log('[CustomersPage] No matching role - showing 0 customers');
     }
 
-    return baseCustomers.map(customer => {
+    const customersWithDetails = baseCustomers.map(customer => {
       const agent = users.find(u => u.id === customer.registeredByAgentId);
       const rm = users.find(u => u.id === customer.assignedRmId);
       return {
@@ -47,6 +60,9 @@ const CustomersPage: React.FC = () => {
         rmName: rm ? rm.name : 'N/A',
       };
     });
+    
+    console.log('[CustomersPage] Final customersWithDetails:', customersWithDetails.length);
+    return customersWithDetails;
   }, [customers, users, user]);
 
   const filteredCustomers = useMemo(() => {
@@ -160,12 +176,32 @@ const CustomersPage: React.FC = () => {
     { label: 'Completed', value: 'Completed' },
   ];
 
+  // Debug: Log customer data
+  React.useEffect(() => {
+    console.log('[CustomersPage] Component rendered:', {
+      totalCustomers: customers.length,
+      customersWithDetailsCount: customersWithDetails.length,
+      filteredCustomersCount: filteredCustomers.length,
+      userRoles: user?.roles,
+      isAdmin: user?.roles.includes(UserRole.ADMIN),
+      canManageCustomers
+    });
+  }, [customers, customersWithDetails, filteredCustomers, user, canManageCustomers]);
+
   return (
     <DashboardLayout>
       <div className="space-y-6">
-        <h1 className="text-3xl font-bold text-gray-800">
-            {user?.roles.includes(UserRole.RELATIONSHIP_MANAGER) && !canManageCustomers ? 'My Assigned Customers' : 'Customer Management'}
-        </h1>
+        <div className="flex justify-between items-center">
+          <h1 className="text-3xl font-bold text-gray-800">
+              {user?.roles.includes(UserRole.RELATIONSHIP_MANAGER) && !canManageCustomers ? 'My Assigned Customers' : 'Customer Management'}
+          </h1>
+          {/* Debug info - remove in production */}
+          {process.env.NODE_ENV === 'development' && (
+            <div className="text-xs text-gray-500">
+              Total: {customers.length} | Showing: {filteredCustomers.length}
+            </div>
+          )}
+        </div>
 
         <Card>
           <div className="space-y-4">
@@ -211,9 +247,9 @@ const CustomersPage: React.FC = () => {
                     ))}
                 </div>
                 <div className="flex items-center gap-2">
-                    <input type="date" value={startDate} onChange={e => setStartDate(e.target.value)} className="px-2 py-1.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-1 focus:ring-primary"/>
+                    <input type="date" value={startDate} onChange={e => setStartDate(e.target.value)} className="px-2 py-1.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-1 focus:ring-primary text-gray-900 bg-white"/>
                     <span className="text-gray-600">to</span>
-                    <input type="date" value={endDate} onChange={e => setEndDate(e.target.value)} min={startDate} className="px-2 py-1.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-1 focus:ring-primary"/>
+                    <input type="date" value={endDate} onChange={e => setEndDate(e.target.value)} min={startDate} className="px-2 py-1.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-1 focus:ring-primary text-gray-900 bg-white"/>
                     <button onClick={handleClearDates} className="text-sm text-gray-600 hover:text-primary underline">Clear</button>
                 </div>
             </div>

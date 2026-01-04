@@ -98,18 +98,24 @@ const BookingsPage: React.FC = () => {
         }
     };
 
-    const handleConfirmStatusUpdate = () => {
+    const handleConfirmStatusUpdate = async () => {
         if (!confirmationDetails) return;
 
         const { bookingId, newStatus, oldStatus, type } = confirmationDetails;
-        if (type === 'status') {
-            updateBooking(bookingId, { status: newStatus as BookingStatus });
-        } else if (type === 'paymentStatus') {
-            updateBooking(bookingId, { paymentStatus: newStatus as PaymentStatus });
+        try {
+            if (type === 'status') {
+                await updateBooking(bookingId, { status: newStatus as BookingStatus });
+            } else if (type === 'paymentStatus') {
+                await updateBooking(bookingId, { paymentStatus: newStatus as PaymentStatus });
+            }
+            
+            addToast(`Booking updated from "${oldStatus}" to "${newStatus}".`, 'success');
+            setConfirmationDetails(null);
+        } catch (error) {
+            console.error('Error updating booking:', error);
+            const errorMessage = error instanceof Error ? error.message : 'Failed to update booking';
+            addToast(errorMessage, 'error');
         }
-        
-        addToast(`Booking updated from "${oldStatus}" to "${newStatus}".`, 'success');
-        setConfirmationDetails(null);
     };
 
     const bookingStatusOptions: BookingStatus[] = ['Pending', 'Confirmed', 'Completed'];

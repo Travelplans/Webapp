@@ -4,13 +4,13 @@
 
 import { User, UserRole, Permission, CustomRole } from '../types';
 
-// System role to permission mapping
-const SYSTEM_ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
+// Default system role to permission mapping (fallback if not in Firestore)
+export const DEFAULT_SYSTEM_ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
   [UserRole.ADMIN]: Object.values(Permission), // Admin has all permissions
   [UserRole.AGENT]: [
     Permission.VIEW_ITINERARY,
-    Permission.CREATE_ITINERARY,
-    Permission.EDIT_ITINERARY,
+    // Removed CREATE_ITINERARY - only admins can create
+    Permission.EDIT_ITINERARY, // Only for assigned itineraries (enforced by Firestore rules)
     Permission.VIEW_CUSTOMER,
     Permission.CREATE_CUSTOMER,
     Permission.EDIT_CUSTOMER,
@@ -42,10 +42,99 @@ const SYSTEM_ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
   ],
 };
 
+// Cache for system roles loaded from Firestore
+let systemRolesCache: Map<UserRole, Permission[]> | null = null;
+let systemRolesCacheTimestamp: number = 0;
+// Keep this short so permission changes in Firestore reflect quickly in the UI.
+const CACHE_DURATION = 10 * 1000; // 10 seconds
+
+/**
+ * Get system role permissions from Firestore or fallback to defaults
+ */
+export const getSystemRolePermissions = async (role: UserRole): Promise<Permission[]> => {
+  // Try to load from Firestore if cache is expired or doesn't exist
+  if (!systemRolesCache || Date.now() - systemRolesCacheTimestamp > CACHE_DURATION) {
+    try {
+      const { collection, getDocs } = await import('firebase/firestore');
+      const { db } = await import('../../config/firebase');
+      
+      const systemRolesSnapshot = await getDocs(collection(db, 'systemRoles'));
+      const rolesMap = new Map<UserRole, Permission[]>();
+      
+      systemRolesSnapshot.docs.forEach(doc => {
+        const data = doc.data();
+        const roleName = data.name as UserRole;
+        if (roleName && data.permissions && Array.isArray(data.permissions)) {
+          rolesMap.set(roleName, data.permissions as Permission[]);
+        }
+      });
+      
+      // If we found system roles in Firestore, use them; otherwise use defaults
+      if (rolesMap.size > 0) {
+        systemRolesCache = rolesMap;
+      } else {
+        // Initialize Firestore with defaults if empty
+        systemRolesCache = new Map(Object.entries(DEFAULT_SYSTEM_ROLE_PERMISSIONS) as [UserRole, Permission[]][]);
+      }
+      
+      systemRolesCacheTimestamp = Date.now();
+    } catch (error) {
+      console.warn('[getSystemRolePermissions] Error loading from Firestore, using defaults:', error);
+      // Use defaults on error
+      systemRolesCache = new Map(Object.entries(DEFAULT_SYSTEM_ROLE_PERMISSIONS) as [UserRole, Permission[]][]);
+    }
+  }
+  
+  // Return from cache or defaults
+  return systemRolesCache?.get(role) || DEFAULT_SYSTEM_ROLE_PERMISSIONS[role] || [];
+};
+
+/**
+ * Clear the system roles cache (call after updating system roles)
+ */
+export const clearSystemRolesCache = () => {
+  systemRolesCache = null;
+  systemRolesCacheTimestamp = 0;
+};
+
 /**
  * Get all permissions for a user (from system roles + custom roles)
+ * Note: This is async now to support loading system roles from Firestore
  */
-export const getUserPermissions = (
+export const getUserPermissions = async (
+  user: User | null,
+  customRoles: CustomRole[] = []
+): Promise<Permission[]> => {
+  if (!user) return [];
+
+  const permissions = new Set<Permission>();
+
+  // Add permissions from system roles (load from Firestore or use defaults)
+  for (const role of user.roles) {
+    const rolePermissions = await getSystemRolePermissions(role);
+    rolePermissions.forEach((perm) => permissions.add(perm));
+  }
+
+  // Add permissions from custom roles
+  if (user.customRoles) {
+    user.customRoles.forEach((roleId) => {
+      const customRole = customRoles.find((r) => r.id === roleId);
+      customRole?.permissions.forEach((perm) => permissions.add(perm));
+    });
+  }
+
+  // Add direct permissions
+  if (user.permissions) {
+    user.permissions.forEach((perm) => permissions.add(perm));
+  }
+
+  return Array.from(permissions);
+};
+
+/**
+ * Synchronous version that uses defaults (for backwards compatibility)
+ */
+export const getUserPermissionsSync = (
   user: User | null,
   customRoles: CustomRole[] = []
 ): Permission[] => {
@@ -53,9 +142,9 @@ export const getUserPermissions = (
 
   const permissions = new Set<Permission>();
 
-  // Add permissions from system roles
+  // Add permissions from system roles (use defaults)
   user.roles.forEach((role) => {
-    SYSTEM_ROLE_PERMISSIONS[role]?.forEach((perm) => permissions.add(perm));
+    DEFAULT_SYSTEM_ROLE_PERMISSIONS[role]?.forEach((perm) => permissions.add(perm));
   });
 
   // Add permissions from custom roles
@@ -75,9 +164,28 @@ export const getUserPermissions = (
 };
 
 /**
- * Check if user has a specific permission
+ * Check if user has a specific permission (async version)
  */
-export const hasPermission = (
+export const hasPermission = async (
+  user: User | null,
+  permission: Permission,
+  customRoles: CustomRole[] = []
+): Promise<boolean> => {
+  if (!user) return false;
+
+  // Admin always has all permissions
+  if (user.roles.includes(UserRole.ADMIN)) {
+    return true;
+  }
+
+  const userPermissions = await getUserPermissions(user, customRoles);
+  return userPermissions.includes(permission);
+};
+
+/**
+ * Synchronous version for backwards compatibility
+ */
+export const hasPermissionSync = (
   user: User | null,
   permission: Permission,
   customRoles: CustomRole[] = []
@@ -89,29 +197,44 @@ export const hasPermission = (
     return true;
   }
 
-  const userPermissions = getUserPermissions(user, customRoles);
+  const userPermissions = getUserPermissionsSync(user, customRoles);
   return userPermissions.includes(permission);
 };
 
 /**
- * Check if user has any of the specified permissions
+ * Check if user has any of the specified permissions (async version)
  */
-export const hasAnyPermission = (
+export const hasAnyPermission = async (
   user: User | null,
   permissions: Permission[],
   customRoles: CustomRole[] = []
-): boolean => {
+): Promise<boolean> => {
   if (!user) return false;
   if (user.roles.includes(UserRole.ADMIN)) return true;
 
-  const userPermissions = getUserPermissions(user, customRoles);
+  const userPermissions = await getUserPermissions(user, customRoles);
   return permissions.some((perm) => userPermissions.includes(perm));
 };
 
 /**
- * Check if user has all of the specified permissions
+ * Check if user has all of the specified permissions (async version)
  */
-export const hasAllPermissions = (
+export const hasAllPermissions = async (
+  user: User | null,
+  permissions: Permission[],
+  customRoles: CustomRole[] = []
+): Promise<boolean> => {
+  if (!user) return false;
+  if (user.roles.includes(UserRole.ADMIN)) return true;
+
+  const userPermissions = await getUserPermissions(user, customRoles);
+  return permissions.every((perm) => userPermissions.includes(perm));
+};
+
+/**
+ * Synchronous versions for backwards compatibility
+ */
+export const hasAnyPermissionSync = (
   user: User | null,
   permissions: Permission[],
   customRoles: CustomRole[] = []
@@ -119,7 +242,19 @@ export const hasAllPermissions = (
   if (!user) return false;
   if (user.roles.includes(UserRole.ADMIN)) return true;
 
-  const userPermissions = getUserPermissions(user, customRoles);
+  const userPermissions = getUserPermissionsSync(user, customRoles);
+  return permissions.some((perm) => userPermissions.includes(perm));
+};
+
+export const hasAllPermissionsSync = (
+  user: User | null,
+  permissions: Permission[],
+  customRoles: CustomRole[] = []
+): boolean => {
+  if (!user) return false;
+  if (user.roles.includes(UserRole.ADMIN)) return true;
+
+  const userPermissions = getUserPermissionsSync(user, customRoles);
   return permissions.every((perm) => userPermissions.includes(perm));
 };
 

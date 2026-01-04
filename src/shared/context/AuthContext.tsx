@@ -1,7 +1,7 @@
 import React, { createContext, useState, useEffect, ReactNode } from 'react';
 import { User } from '../types';
 import { auth, db } from '../../config/firebase';
-import { signInWithEmailAndPassword, signOut, onAuthStateChanged, User as FirebaseUser } from 'firebase/auth';
+import { signInWithEmailAndPassword, signOut, onAuthStateChanged, User as FirebaseUser, sendPasswordResetEmail } from 'firebase/auth';
 import { doc, getDoc } from 'firebase/firestore';
 
 interface AuthContextType {
@@ -10,6 +10,7 @@ interface AuthContextType {
   loading: boolean;
   login: (email: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
+  resetPassword: (email: string) => Promise<void>;
 }
 
 export const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -23,35 +24,13 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    // Mark that we're initializing auth
+    setLoading(true);
+
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser: FirebaseUser | null) => {
       if (firebaseUser) {
         try {
           // Fetch additional user details (roles) from Firestore
-          // We assume the Firestore user ID matches the Auth UID or email is used for lookup
-          // For this implementation, let's assume we store users in Firestore with their Auth UID
-          // OR, since we are migrating from mock data where IDs are like 'user-admin-1', 
-          // we might need a mapping strategy. 
-          // For a clean production setup, we should ideally use Auth UID as document ID.
-          // However, to support the existing mock data structure during transition:
-          // We will try to find a user in Firestore by email.
-
-          // NOTE: In a real production app, you should use `doc(db, 'users', firebaseUser.uid)`
-          // But since we are seeding data with custom IDs, we'll need to query by email or update the seeding to use UIDs.
-          // For now, let's try to fetch by email if direct ID lookup fails, or just rely on the seeding script 
-          // to eventually be updated to use real Auth UIDs.
-
-          // Let's assume for now that the user document might not exist yet if it's a fresh signup,
-          // but here we are only handling login.
-
-          // Strategy: Query 'users' collection where email == firebaseUser.email
-          // This requires an index, but for small datasets it works.
-          // Actually, let's just use the `getUserById` equivalent logic but searching.
-
-          // Since we can't easily query without importing the service, let's do a direct Firestore fetch here.
-          // We will assume the user document ID matches the Auth UID for new users, 
-          // but for the seeded users, we might have a disconnect.
-          // To make this work with the SEEDED data, we need to manually link them or just use the email to find the role.
-
           // Use Auth UID directly as document ID (efficient approach)
           const { doc, getDoc, setDoc } = await import('firebase/firestore');
           const userDocRef = doc(db, 'users', firebaseUser.uid);
@@ -82,10 +61,14 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       } else {
         setUser(null);
       }
+      // Always set loading to false after auth state is determined
       setLoading(false);
     });
 
-    return () => unsubscribe();
+    // Cleanup subscription on unmount
+    return () => {
+      unsubscribe();
+    };
   }, []);
 
   const login = async (email: string, password: string) => {
@@ -109,10 +92,44 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     }
   };
 
+  const resetPassword = async (email: string) => {
+    try {
+      // Configure action code settings for password reset
+      const actionCodeSettings = {
+        url: window.location.origin + '/login',
+        handleCodeInApp: false,
+      };
+      
+      console.log('[resetPassword] Sending password reset email to:', email);
+      await sendPasswordResetEmail(auth, email, actionCodeSettings);
+      console.log('[resetPassword] Password reset email sent successfully');
+    } catch (error: any) {
+      console.error('[resetPassword] Error details:', {
+        code: error.code,
+        message: error.message,
+        email: email
+      });
+      
+      const { logger } = await import('../utils/logger');
+      logger.error('Password reset error', error);
+      
+      // Provide user-friendly error messages
+      if (error.code === 'auth/user-not-found') {
+        throw new Error('No account found with this email address.');
+      } else if (error.code === 'auth/invalid-email') {
+        throw new Error('Please enter a valid email address.');
+      } else if (error.code === 'auth/too-many-requests') {
+        throw new Error('Too many requests. Please try again later.');
+      } else {
+        throw new Error(error.message || 'Failed to send password reset email. Please try again.');
+      }
+    }
+  };
+
   const isAuthenticated = !!user;
 
   return (
-    <AuthContext.Provider value={{ isAuthenticated, user, loading, login, logout }}>
+    <AuthContext.Provider value={{ isAuthenticated, user, loading, login, logout, resetPassword }}>
       {children}
     </AuthContext.Provider>
   );

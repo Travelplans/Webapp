@@ -1,13 +1,13 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { Link } from 'react-router-dom';
 import { useData } from '../../hooks/useData';
 import Card from '../shared/Card';
 import Button from '../shared/Button';
-import { UsersIcon, BriefcaseIcon, DollarSignIcon, UserCircleIcon } from '../shared/icons/Icons';
+import { UsersIcon, BriefcaseIcon } from '../shared/icons/Icons';
 
 
 const AdminDashboard: React.FC = () => {
-  const { users, itineraries } = useData();
+  const { users, itineraries, loading } = useData();
 
   return (
     <div className="space-y-8">
@@ -22,7 +22,7 @@ const AdminDashboard: React.FC = () => {
             </div>
             <div className="ml-4">
               <p className="text-sm font-medium text-gray-500">Total Users</p>
-              <p className="text-2xl font-bold text-gray-900">{users.length}</p>
+              <p className="text-2xl font-bold text-gray-900">{loading ? '...' : users.length}</p>
             </div>
           </div>
         </Card>
@@ -33,7 +33,7 @@ const AdminDashboard: React.FC = () => {
             </div>
             <div className="ml-4">
               <p className="text-sm font-medium text-gray-500">Total Itineraries</p>
-              <p className="text-2xl font-bold text-gray-900">{itineraries.length}</p>
+              <p className="text-2xl font-bold text-gray-900">{loading ? '...' : itineraries.length}</p>
             </div>
           </div>
         </Card>

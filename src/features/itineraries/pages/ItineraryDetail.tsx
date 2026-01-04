@@ -11,7 +11,18 @@ const ItineraryDetailPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const { itineraries, users } = useData();
   const itinerary = itineraries.find(it => it.id === id);
-  const agent = users.find(user => user.id === itinerary?.assignedAgentId);
+  
+  // Get assigned agents (support both old and new format)
+  const assignedAgents = React.useMemo(() => {
+    if (!itinerary) return [];
+    if (itinerary.assignedAgentIds && Array.isArray(itinerary.assignedAgentIds)) {
+      return users.filter(user => itinerary.assignedAgentIds!.includes(user.id));
+    } else if (itinerary.assignedAgentId) {
+      const agent = users.find(user => user.id === itinerary.assignedAgentId);
+      return agent ? [agent] : [];
+    }
+    return [];
+  }, [itinerary, users]);
 
   const getCollateralIcon = (type: CollateralType) => {
     const wrapperClass = "flex items-center justify-center w-10 h-10 rounded-lg";
@@ -34,16 +45,103 @@ const ItineraryDetailPage: React.FC = () => {
   };
   
   const handleDownload = (collateral: ItineraryCollateral) => {
-    const fileContent = `This is a mock collateral document for ${collateral.name}.\n\nType: ${collateral.type}\nStatus: ${collateral.approved ? 'Approved' : 'Pending'}`;
-    const blob = new Blob([fileContent], { type: 'text/plain' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.setAttribute('download', collateral.name);
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    URL.revokeObjectURL(url);
+    if (!collateral.url) {
+      console.warn('No URL available for collateral:', collateral.name);
+      return;
+    }
+    
+    // If it's a data URL, convert it to a blob and download
+    if (collateral.url.startsWith('data:')) {
+      try {
+        // Extract the base64 data and mime type from data URL
+        const [header, data] = collateral.url.split(',');
+        const mimeMatch = header.match(/data:([^;]+)/);
+        const mimeType = mimeMatch ? mimeMatch[1] : 'application/octet-stream';
+        
+        // Convert base64 to binary
+        const binaryString = atob(data);
+        const bytes = new Uint8Array(binaryString.length);
+        for (let i = 0; i < binaryString.length; i++) {
+          bytes[i] = binaryString.charCodeAt(i);
+        }
+        
+        const blob = new Blob([bytes], { type: mimeType });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        
+        // Determine file extension from mime type or use collateral type
+        let extension = '';
+        if (mimeType.includes('pdf')) extension = '.pdf';
+        else if (mimeType.includes('word') || mimeType.includes('document')) extension = '.docx';
+        else if (mimeType.includes('powerpoint') || mimeType.includes('presentation')) extension = '.pptx';
+        else if (mimeType.includes('image')) extension = mimeType.includes('png') ? '.png' : '.jpg';
+        else if (mimeType.includes('video')) extension = '.mp4';
+        
+        link.setAttribute('download', collateral.name + extension);
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(url);
+      } catch (error) {
+        console.error('Error downloading file:', error);
+        // Fallback: open in new window
+        window.open(collateral.url, '_blank');
+      }
+    } else {
+      // Regular URL - open in new window
+      window.open(collateral.url, '_blank');
+    }
+  };
+  
+  const handleView = (collateral: ItineraryCollateral) => {
+    if (!collateral.url) {
+      console.warn('No URL available for collateral:', collateral.name);
+      return;
+    }
+    
+    // If it's a data URL, convert it to a blob and open in new window
+    if (collateral.url.startsWith('data:')) {
+      try {
+        // Extract the base64 data and mime type from data URL
+        const [header, data] = collateral.url.split(',');
+        const mimeMatch = header.match(/data:([^;]+)/);
+        const mimeType = mimeMatch ? mimeMatch[1] : 'application/octet-stream';
+        
+        // Convert base64 to binary
+        const binaryString = atob(data);
+        const bytes = new Uint8Array(binaryString.length);
+        for (let i = 0; i < binaryString.length; i++) {
+          bytes[i] = binaryString.charCodeAt(i);
+        }
+        
+        const blob = new Blob([bytes], { type: mimeType });
+        const blobUrl = URL.createObjectURL(blob);
+        
+        // Open blob URL in new window
+        const newWindow = window.open(blobUrl, '_blank');
+        if (newWindow) {
+          // Clean up blob URL after a delay to allow the window to load
+          setTimeout(() => URL.revokeObjectURL(blobUrl), 1000);
+        } else {
+          // If popup blocked, fall back to download
+          const link = document.createElement('a');
+          link.href = blobUrl;
+          link.target = '_blank';
+          document.body.appendChild(link);
+          link.click();
+          document.body.removeChild(link);
+          setTimeout(() => URL.revokeObjectURL(blobUrl), 1000);
+        }
+      } catch (error) {
+        console.error('Error viewing file:', error);
+        // Fallback: try to open original URL
+        window.open(collateral.url, '_blank');
+      }
+    } else {
+      // Regular URL - open in new window/tab
+      window.open(collateral.url, '_blank');
+    }
   };
 
   if (!itinerary) {
@@ -87,16 +185,39 @@ const ItineraryDetailPage: React.FC = () => {
                         <p className="mt-4 text-gray-700">{itinerary.description}</p>
                     )}
                     
+                    {/* Display Daily Plan if available */}
+                    {itinerary.dailyPlan && Array.isArray(itinerary.dailyPlan) && itinerary.dailyPlan.length > 0 && (
+                        <div className="mt-6 border-t pt-6">
+                            <h3 className="text-2xl font-bold text-gray-800 mb-4">Day-by-Day Itinerary</h3>
+                            <div className="space-y-4">
+                                {itinerary.dailyPlan.map((day, index) => (
+                                    <div key={day.day || index} className="p-4 bg-gray-50 rounded-lg border border-gray-200">
+                                        <h4 className="font-bold text-lg text-primary mb-2">Day {day.day}: {day.title}</h4>
+                                        <p className="text-gray-700 whitespace-pre-wrap">{day.activities}</p>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    )}
+                    
                     <div className="mt-6 flex justify-between items-center text-gray-800 border-t pt-6 border-gray-200">
                         <span className="text-2xl font-bold text-primary">AED {itinerary.price.toLocaleString()}</span>
                         <span className="text-lg font-medium">{itinerary.duration} Days</span>
                     </div>
 
                     <div className="mt-6 border-t pt-6 border-gray-200">
-                        {agent ? (
+                        {assignedAgents.length > 0 ? (
                           <div>
-                            <p className="text-sm text-gray-500">Managed by</p>
-                            <p className="text-lg font-semibold text-gray-900">{agent.name}</p>
+                            <p className="text-sm text-gray-500 mb-2">
+                              {assignedAgents.length === 1 ? 'Managed by' : 'Managed by'}
+                            </p>
+                            <div className="space-y-1">
+                              {assignedAgents.map(agent => (
+                                <p key={agent.id} className="text-lg font-semibold text-gray-900">
+                                  {agent.name}
+                                </p>
+                              ))}
+                            </div>
                           </div>
                         ) : (
                            <p className="text-md text-gray-500 italic">This itinerary is currently unassigned.</p>
@@ -113,31 +234,40 @@ const ItineraryDetailPage: React.FC = () => {
               {itinerary.collaterals.length > 0 ? (
                 <ul className="space-y-3">
                   {itinerary.collaterals.map((collateral: ItineraryCollateral) => (
-                    <li key={collateral.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg border border-gray-200">
-                      <div className="flex items-center space-x-4">
+                    <li key={collateral.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg border border-gray-200 gap-3">
+                      <div className="flex items-center space-x-4 min-w-0 flex-1">
                         {getCollateralIcon(collateral.type)}
                         <span className="font-medium text-gray-700 truncate">{collateral.name}</span>
                       </div>
-                      <div className="flex items-center space-x-3">
-                        <span className={`px-3 py-1 text-xs font-semibold rounded-full ${
-                            collateral.approved 
+                      <div className="flex items-center space-x-2 flex-shrink-0">
+                        <span className={`px-3 py-1 text-xs font-semibold rounded-full whitespace-nowrap ${
+                            collateral.approved && collateral.url
                             ? 'bg-green-100 text-green-800' 
                             : 'bg-yellow-100 text-yellow-800'
                         }`}>
-                          {collateral.approved ? 'Approved' : 'Pending'}
+                          {collateral.approved && collateral.url ? 'Active/Uploaded' : 'Pending'}
                         </span>
-                        <button
-                           onClick={() => handleDownload(collateral)}
-                           disabled={!collateral.approved}
-                           className={`p-2 rounded-md transition-colors ${
-                            collateral.approved 
-                            ? 'bg-blue-100 text-primary hover:bg-blue-200' 
-                            : 'bg-gray-200 text-gray-400 cursor-not-allowed'
-                           }`}
-                           title={collateral.approved ? `Download ${collateral.name}` : 'Approval pending'}
-                        >
-                          <DownloadIcon className="w-5 h-5" />
-                        </button>
+                        {collateral.url && (
+                          <>
+                            <button
+                               onClick={() => handleView(collateral)}
+                               className="p-2 rounded-md transition-colors bg-blue-100 text-primary hover:bg-blue-200 flex-shrink-0"
+                               title={`View ${collateral.name}`}
+                            >
+                              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                              </svg>
+                            </button>
+                            <button
+                               onClick={() => handleDownload(collateral)}
+                               className="p-2 rounded-md transition-colors bg-blue-100 text-primary hover:bg-blue-200 flex-shrink-0"
+                               title={`Download ${collateral.name}`}
+                            >
+                              <DownloadIcon className="w-5 h-5" />
+                            </button>
+                          </>
+                        )}
                       </div>
                     </li>
                   ))}

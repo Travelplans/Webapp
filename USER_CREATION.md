@@ -87,3 +87,7 @@ Once users are created, you can:
 - **"Permission denied"**: Check Firestore security rules
 - **"Auth method not enabled"**: Enable Email/Password in Firebase Console
 
+
+
+
+

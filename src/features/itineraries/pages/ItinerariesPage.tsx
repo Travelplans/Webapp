@@ -18,6 +18,19 @@ const ItinerariesPage: React.FC = () => {
   const { itineraries, addItinerary, updateItinerary, deleteItinerary } = useData();
   const { addToast } = useToast();
   const [searchQuery, setSearchQuery] = useState('');
+  
+  // Debug: Log when itineraries change
+  React.useEffect(() => {
+    console.log('[ItinerariesPage] Itineraries updated:', {
+      count: itineraries.length,
+      itineraries: itineraries.map(it => ({
+        id: it.id,
+        title: it.title,
+        destination: it.destination,
+        hasImage: !!it.imageUrl
+      }))
+    });
+  }, [itineraries]);
 
   const [isModalOpen, setModalOpen] = useState(false);
   const [isConfirmOpen, setConfirmOpen] = useState(false);
@@ -25,14 +38,93 @@ const ItinerariesPage: React.FC = () => {
   const [itineraryToDelete, setItineraryToDelete] = useState<Itinerary | null>(null);
   
   const isAdmin = user?.roles.includes(UserRole.ADMIN);
-  const canCreateItinerary = isAdmin || hasPermission(user, Permission.CREATE_ITINERARY);
+  const isAgent = user?.roles.includes(UserRole.AGENT);
+  const [canCreateItinerary, setCanCreateItinerary] = useState<boolean>(!!isAdmin);
+
+  React.useEffect(() => {
+    let cancelled = false;
+    const compute = async () => {
+      if (isAdmin) {
+        if (!cancelled) setCanCreateItinerary(true);
+        return;
+      }
+      const allowed = await hasPermission(user ?? null, Permission.CREATE_ITINERARY);
+      if (!cancelled) setCanCreateItinerary(allowed);
+    };
+    compute();
+    return () => {
+      cancelled = true;
+    };
+  }, [isAdmin, user?.id, user?.roles]);
 
   const filteredItineraries = useMemo(() => {
-    return itineraries.filter(itinerary =>
-      itinerary.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      itinerary.destination.toLowerCase().includes(searchQuery.toLowerCase())
-    );
-  }, [searchQuery, itineraries]);
+    console.log('[ItinerariesPage] Filtering itineraries:', {
+      total: itineraries.length,
+      searchQuery,
+      isAdmin,
+      isAgent,
+      userId: user?.id,
+      itineraryTitles: itineraries.map(it => it.title)
+    });
+    
+    // Filter by role: Agents only see their assigned itineraries
+    let roleFiltered = itineraries;
+    if (isAgent && !isAdmin && user?.id) {
+      roleFiltered = itineraries.filter(it => {
+        // Check new format (assignedAgentIds array) - primary check
+        if (it.assignedAgentIds && Array.isArray(it.assignedAgentIds) && it.assignedAgentIds.length > 0) {
+          const isAssigned = it.assignedAgentIds.includes(user.id);
+          if (isAssigned) {
+            console.log('[ItinerariesPage] Itinerary assigned via assignedAgentIds:', {
+              itineraryId: it.id,
+              title: it.title,
+              assignedAgentIds: it.assignedAgentIds,
+              userId: user.id
+            });
+          }
+          return isAssigned;
+        }
+        // Check old format (assignedAgentId) for backward compatibility
+        if (it.assignedAgentId) {
+          const isAssigned = it.assignedAgentId === user.id;
+          if (isAssigned) {
+            console.log('[ItinerariesPage] Itinerary assigned via assignedAgentId:', {
+              itineraryId: it.id,
+              title: it.title,
+              assignedAgentId: it.assignedAgentId,
+              userId: user.id
+            });
+          }
+          return isAssigned;
+        }
+        // If no assignment, agent cannot see it
+        return false;
+      });
+      console.log('[ItinerariesPage] Agent filtered itineraries:', {
+        userId: user.id,
+        total: itineraries.length,
+        assigned: roleFiltered.length,
+        assignedIds: roleFiltered.map(it => ({ id: it.id, title: it.title, assignedAgentIds: it.assignedAgentIds, assignedAgentId: it.assignedAgentId }))
+      });
+    }
+    
+    // Then filter by search query
+    const filtered = roleFiltered.filter(itinerary => {
+      if (!itinerary.title || !itinerary.destination) {
+        console.warn('[ItinerariesPage] Itinerary missing required fields:', itinerary);
+        return false;
+      }
+      return itinerary.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        itinerary.destination.toLowerCase().includes(searchQuery.toLowerCase());
+    });
+    
+    console.log('[ItinerariesPage] Filtered result:', {
+      filtered: filtered.length,
+      filteredTitles: filtered.map(it => it.title)
+    });
+    
+    return filtered;
+  }, [searchQuery, itineraries, isAdmin, isAgent, user?.id]);
 
   const handleOpenCreateModal = () => {
     setItineraryToEdit(undefined);
@@ -59,22 +151,40 @@ const ItinerariesPage: React.FC = () => {
     setItineraryToDelete(null);
   };
 
-  const handleFormSubmit = (itinerary: Itinerary) => {
-    if (itinerary.id) {
-      updateItinerary(itinerary);
-      addToast('Itinerary updated successfully!', 'success');
-    } else {
-      addItinerary(itinerary);
-      addToast('Itinerary created successfully!', 'success');
+  const handleFormSubmit = async (itinerary: Itinerary | Omit<Itinerary, 'id'>) => {
+    try {
+      console.log('[ItinerariesPage] Submitting itinerary:', { 
+        isEdit: 'id' in itinerary && !!itinerary.id,
+        hasTitle: !!itinerary.title,
+        hasDestination: !!itinerary.destination 
+      });
+      
+      if ('id' in itinerary && itinerary.id) {
+        await updateItinerary(itinerary as Itinerary);
+        addToast('Itinerary updated successfully!', 'success');
+      } else {
+        await addItinerary(itinerary as Omit<Itinerary, 'id'>);
+        addToast('Itinerary created successfully!', 'success');
+      }
+      handleCloseModal();
+    } catch (error) {
+      console.error('[ItinerariesPage] Error saving itinerary:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Failed to save itinerary';
+      addToast(errorMessage, 'error');
     }
-    handleCloseModal();
   };
 
-  const handleDelete = () => {
+  const handleDelete = async () => {
     if (itineraryToDelete) {
-      deleteItinerary(itineraryToDelete.id);
-      addToast(`Itinerary "${itineraryToDelete.title}" deleted successfully.`, 'success');
-      handleCloseConfirm();
+      try {
+        await deleteItinerary(itineraryToDelete.id);
+        addToast(`Itinerary "${itineraryToDelete.title}" deleted successfully.`, 'success');
+        handleCloseConfirm();
+      } catch (error) {
+        console.error('[ItinerariesPage] Error deleting itinerary:', error);
+        const errorMessage = error instanceof Error ? error.message : 'Failed to delete itinerary';
+        addToast(errorMessage, 'error');
+      }
     }
   };
 
@@ -103,7 +213,16 @@ const ItinerariesPage: React.FC = () => {
                 <Card key={it.id} className="overflow-hidden !p-0 flex flex-col group h-full">
                   <div className="relative">
                     <Link to={`/itinerary/${it.id}`} className="block">
-                      <img src={it.imageUrl} alt={it.title} className="w-full h-48 object-cover group-hover:opacity-80 transition-opacity" />
+                      <img 
+                        src={it.imageUrl || 'https://images.unsplash.com/photo-1501785888041-af3ef285b470?q=80&w=2070'} 
+                        alt={it.title || 'Itinerary'} 
+                        className="w-full h-48 object-cover group-hover:opacity-80 transition-opacity"
+                        onError={(e) => {
+                          // Fallback to default image if image fails to load
+                          const target = e.target as HTMLImageElement;
+                          target.src = 'https://images.unsplash.com/photo-1501785888041-af3ef285b470?q=80&w=2070';
+                        }}
+                      />
                     </Link>
                     {canCreateItinerary && (
                         <div className="absolute top-2 right-2 flex space-x-2 opacity-0 group-hover:opacity-100 transition-opacity">

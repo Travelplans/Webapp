@@ -86,40 +86,59 @@ const getFirebaseErrorMessage = (error: any): ErrorDetails => {
 
 /**
  * Handles errors and returns user-friendly messages
+ * Uses error cache to prevent duplicate error messages
  */
-export const handleError = (error: unknown): ErrorDetails => {
+import { cacheAndCheckError, shouldShowError } from './errorCache';
+
+export const handleError = (error: unknown, suppressDuplicates: boolean = true): ErrorDetails => {
   logger.error('Error occurred', error);
 
+  let errorDetails: ErrorDetails;
+
   if (error instanceof AppError) {
-    return {
+    errorDetails = {
       code: error.code,
       message: error.message,
       userMessage: error.userMessage,
       statusCode: error.statusCode,
     };
-  }
-
-  if (error instanceof Error) {
+  } else if (error instanceof Error) {
     // Check if it's a Firebase error (check both message and code property)
     const errorCode = (error as any).code || '';
     if (errorCode.startsWith('auth/') || error.message.includes('Firebase') || error.message.includes('auth/')) {
-      return getFirebaseErrorMessage({ code: errorCode || error.message, message: error.message });
+      errorDetails = getFirebaseErrorMessage({ code: errorCode || error.message, message: error.message });
+    } else {
+      errorDetails = {
+        code: 'UNKNOWN_ERROR',
+        message: error.message,
+        userMessage: 'An unexpected error occurred. Please try again.',
+        statusCode: 500,
+      };
     }
-
-    return {
+  } else {
+    errorDetails = {
       code: 'UNKNOWN_ERROR',
-      message: error.message,
-      userMessage: 'An unexpected error occurred. Please try again.',
+      message: 'An unknown error occurred',
+      userMessage: 'Something went wrong. Please try again.',
       statusCode: 500,
     };
   }
 
-  return {
-    code: 'UNKNOWN_ERROR',
-    message: 'An unknown error occurred',
-    userMessage: 'Something went wrong. Please try again.',
-    statusCode: 500,
-  };
+  // Cache error and check if it should be shown
+  if (suppressDuplicates) {
+    const { shouldShow, count } = cacheAndCheckError(error, errorDetails.userMessage);
+    if (!shouldShow && count > 1) {
+      // Suppress duplicate error, but log it
+      logger.warn(`Error suppressed (occurred ${count} times)`, error);
+      // Return a special flag to indicate suppression
+      return {
+        ...errorDetails,
+        userMessage: '', // Empty message means suppress
+      };
+    }
+  }
+
+  return errorDetails;
 };
 
 /**

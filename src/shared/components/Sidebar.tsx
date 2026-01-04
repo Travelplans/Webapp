@@ -2,7 +2,7 @@ import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
 import { UserRole } from '../types';
-import { HomeIcon, UsersIcon, BriefcaseIcon, UserCheckIcon, FileTextIcon, CheckCircleIcon, DollarSignIcon, SparklesIcon, ShieldIcon } from './icons/Icons';
+import { HomeIcon, UsersIcon, BriefcaseIcon, UserCheckIcon, FileTextIcon, CheckCircleIcon, DollarSignIcon, SparklesIcon, ShieldIcon, WhatsAppIcon, SettingsIcon } from './icons/Icons';
 
 interface SidebarProps {
   onClose?: () => void;
@@ -25,7 +25,9 @@ const Sidebar: React.FC<SidebarProps> = ({ onClose }) => {
         { icon: <BriefcaseIcon />, label: 'Itineraries', path: '/itineraries' },
         { icon: <DollarSignIcon />, label: 'Bookings', path: '/bookings' },
         { icon: <SparklesIcon />, label: 'AI Itinerary Generator', path: '/generate-itinerary' },
+        { icon: <WhatsAppIcon />, label: 'WhatsApp Messaging', path: '/whatsapp' },
         { icon: <CheckCircleIcon />, label: 'Compliance', path: '/compliance' },
+        { icon: <SettingsIcon />, label: 'API Settings', path: '/settings' },
       ];
     }
     if (user.roles.includes(UserRole.AGENT)) {

@@ -64,11 +64,32 @@ const CustomerDashboard: React.FC = () => {
     }
   };
   
-  const handleBookNow = (itinerary: Itinerary) => {
-     if (customerData) {
-        addBooking({ customerId: customerData.id, itineraryId: itinerary.id });
-        addToast(`Booking request for '${itinerary.title}' sent!`, 'success');
-        setQuickViewItinerary(null); // Close modal on booking
+  const handleBookNow = async (itinerary: Itinerary) => {
+    if (!customerData) {
+      addToast('Customer profile not found. Please contact your agent.', 'error');
+      return;
+    }
+
+    try {
+      console.log('[CustomerDashboard] Creating booking:', {
+        customerId: customerData.id,
+        customerEmail: customerData.email,
+        itineraryId: itinerary.id,
+        itineraryTitle: itinerary.title
+      });
+      
+      await addBooking({ 
+        customerId: customerData.id, 
+        itineraryId: itinerary.id 
+      });
+      
+      console.log('[CustomerDashboard] Booking created successfully');
+      addToast(`Booking request for '${itinerary.title}' sent!`, 'success');
+      setQuickViewItinerary(null); // Close modal on booking
+    } catch (error) {
+      console.error('[CustomerDashboard] Error creating booking:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Failed to create booking. Please try again.';
+      addToast(errorMessage, 'error');
     }
   }
 
@@ -81,8 +102,8 @@ const CustomerDashboard: React.FC = () => {
   }
 
   return (
-    <div className="space-y-8">
-      <h1 className="text-3xl font-bold text-gray-800">My Booking Portal</h1>
+    <div className="space-y-4 sm:space-y-6 lg:space-y-8">
+      <h1 className="text-2xl sm:text-3xl font-bold text-gray-800">My Booking Portal</h1>
       
       {loadingRecs ? (
         <Card>
@@ -93,7 +114,7 @@ const CustomerDashboard: React.FC = () => {
         </Card>
       ) : recommendations.length > 0 && (
           <div>
-            <h2 className="text-2xl font-semibold text-gray-800 mb-4">Recommended For You</h2>
+            <h2 className="text-xl sm:text-2xl font-semibold text-gray-800 mb-3 sm:mb-4">Recommended For You</h2>
              <div className="flex overflow-x-auto space-x-6 pb-4">
                 {recommendations.map(({ itinerary, reason }) => (
                      <Card key={itinerary.id} className="!p-0 w-80 flex-shrink-0 flex flex-col overflow-hidden transition-transform duration-300 hover:-translate-y-1">
@@ -116,7 +137,7 @@ const CustomerDashboard: React.FC = () => {
       )}
 
       <div>
-        <h2 className="text-2xl font-semibold text-gray-800 mb-4">Explore Our Itineraries</h2>
+        <h2 className="text-xl sm:text-2xl font-semibold text-gray-800 mb-3 sm:mb-4">Explore Our Itineraries</h2>
         <div className="relative">
           <div className="flex overflow-x-auto space-x-6 pb-4">
             {itineraries.map(itinerary => {

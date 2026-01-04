@@ -26,24 +26,30 @@ const CreateCustomerModal: React.FC<CreateCustomerModalProps> = ({ isOpen, onClo
     setDob('');
   }
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!user) {
         addToast("You must be logged in to create a customer.", 'error');
         return;
     }
 
-    addCustomer({
-        firstName,
-        lastName,
-        email,
-        dob,
-        registeredByAgentId: user.id,
-    });
-    
-    addToast('Customer registered successfully!', 'success');
-    clearForm();
-    onClose();
+    try {
+      await addCustomer({
+          firstName,
+          lastName,
+          email,
+          dob,
+          registeredByAgentId: user.id,
+      });
+      
+      addToast('Customer registered successfully!', 'success');
+      clearForm();
+      onClose();
+    } catch (error) {
+      console.error('Error creating customer:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Failed to create customer';
+      addToast(errorMessage, 'error');
+    }
   };
   
   const handleClose = () => {
@@ -57,20 +63,20 @@ const CreateCustomerModal: React.FC<CreateCustomerModalProps> = ({ isOpen, onClo
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
                 <label htmlFor="firstName" className="block text-sm font-medium text-gray-700">First Name</label>
-                <input type="text" id="firstName" value={firstName} onChange={e => setFirstName(e.target.value)} required className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-primary focus:border-primary sm:text-sm" />
+                <input type="text" id="firstName" value={firstName} onChange={e => setFirstName(e.target.value)} required className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-primary focus:border-primary sm:text-sm text-gray-900 bg-white" />
             </div>
             <div>
                 <label htmlFor="lastName" className="block text-sm font-medium text-gray-700">Last Name</label>
-                <input type="text" id="lastName" value={lastName} onChange={e => setLastName(e.target.value)} required className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-primary focus:border-primary sm:text-sm" />
+                <input type="text" id="lastName" value={lastName} onChange={e => setLastName(e.target.value)} required className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-primary focus:border-primary sm:text-sm text-gray-900 bg-white" />
             </div>
         </div>
         <div>
           <label htmlFor="email" className="block text-sm font-medium text-gray-700">Email Address</label>
-          <input type="email" id="email" value={email} onChange={e => setEmail(e.target.value)} required className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-primary focus:border-primary sm:text-sm" />
+          <input type="email" id="email" value={email} onChange={e => setEmail(e.target.value)} required className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-primary focus:border-primary sm:text-sm text-gray-900 bg-white" />
         </div>
         <div>
           <label htmlFor="dob" className="block text-sm font-medium text-gray-700">Date of Birth</label>
-          <input type="date" id="dob" value={dob} onChange={e => setDob(e.target.value)} required className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-primary focus:border-primary sm:text-sm" />
+          <input type="date" id="dob" value={dob} onChange={e => setDob(e.target.value)} required className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-primary focus:border-primary sm:text-sm text-gray-900 bg-white" />
         </div>
 
         <div className="pt-5 flex justify-end space-x-3">

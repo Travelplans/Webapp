@@ -10,3 +10,7 @@ firebase functions:config:set googleai.api_key="$API_KEY"
 echo "API key set successfully!"
 echo "To verify, run: firebase functions:config:get"
 
+
+
+
+

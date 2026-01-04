@@ -93,12 +93,22 @@ export const subscribeToItineraries = (callback: (itineraries: Itinerary[]) => v
     });
 };
 
+// Helper to remove undefined values from object
+const removeUndefined = (obj: any): any => {
+    return Object.fromEntries(
+        Object.entries(obj).filter(([_, v]) => v !== undefined)
+    );
+};
+
 export const addItinerary = async (itinerary: Omit<Itinerary, 'id'>): Promise<string> => {
     const itinerariesRef = collection(db, COLLECTIONS.ITINERARIES);
-    const docRef = await addDoc(itinerariesRef, {
+    // Remove undefined values and ensure required fields have defaults
+    const cleanData = removeUndefined({
         ...itinerary,
         collaterals: itinerary.collaterals || [],
+        description: itinerary.description || '',
     });
+    const docRef = await addDoc(itinerariesRef, cleanData);
     return docRef.id;
 };
 

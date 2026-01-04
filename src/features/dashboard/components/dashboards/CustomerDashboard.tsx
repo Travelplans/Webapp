@@ -65,11 +65,32 @@ const CustomerDashboard: React.FC = () => {
     }
   };
   
-  const handleBookNow = (itinerary: Itinerary) => {
-     if (customerData) {
-        addBooking({ customerId: customerData.id, itineraryId: itinerary.id });
-        addToast(`Booking request for '${itinerary.title}' sent!`, 'success');
-        setQuickViewItinerary(null); // Close modal on booking
+  const handleBookNow = async (itinerary: Itinerary) => {
+    if (!customerData) {
+      addToast('Customer profile not found. Please contact your agent.', 'error');
+      return;
+    }
+
+    try {
+      console.log('[CustomerDashboard] Creating booking:', {
+        customerId: customerData.id,
+        customerEmail: customerData.email,
+        itineraryId: itinerary.id,
+        itineraryTitle: itinerary.title
+      });
+      
+      await addBooking({ 
+        customerId: customerData.id, 
+        itineraryId: itinerary.id 
+      });
+      
+      console.log('[CustomerDashboard] Booking created successfully');
+      addToast(`Booking request for '${itinerary.title}' sent!`, 'success');
+      setQuickViewItinerary(null); // Close modal on booking
+    } catch (error) {
+      console.error('[CustomerDashboard] Error creating booking:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Failed to create booking. Please try again.';
+      addToast(errorMessage, 'error');
     }
   }
 
@@ -237,7 +258,7 @@ const CustomerDashboard: React.FC = () => {
                 </div>
                  <div>
                     <label htmlFor="dob" className="block text-sm font-medium text-gray-700">Date of Birth</label>
-                    <input type="date" id="dob" value={dob} onChange={e => setDob(e.target.value)} className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-primary focus:border-primary sm:text-sm" />
+                    <input type="date" id="dob" value={dob} onChange={e => setDob(e.target.value)} className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-primary focus:border-primary sm:text-sm text-gray-900 bg-white" />
                 </div>
               <div className="pt-4 flex justify-end">
                 <Button type="submit">Save Details</Button>

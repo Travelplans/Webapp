@@ -35,9 +35,11 @@ const UserManagementPage: React.FC = () => {
 
   const filteredUsers = useMemo(() => {
     return users.filter(user => {
+      const contactNumber = user.contactNumber ? `${user.countryCode || ''}${user.contactNumber || ''}` : '';
       const searchMatch =
         user.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        user.email.toLowerCase().includes(searchQuery.toLowerCase());
+        user.email.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        contactNumber.includes(searchQuery);
       const roleMatch = roleFilter === 'All' || user.roles.includes(roleFilter as UserRole);
       return searchMatch && roleMatch;
     });
@@ -68,22 +70,49 @@ const UserManagementPage: React.FC = () => {
     setUserToDelete(null);
   };
 
-  const handleFormSubmit = (user: User) => {
-    if (user.id) {
-      updateUser(user);
-      addToast('User updated successfully!', 'success');
-    } else {
-      addUser(user);
-      addToast('User created successfully!', 'success');
+  const handleFormSubmit = async (user: User & { password?: string }) => {
+    try {
+      console.log('[UserManagementPage] Submitting user:', { 
+        isEdit: !!user.id, 
+        email: user.email, 
+        name: user.name, 
+        hasPassword: !!user.password 
+      });
+      
+      if (user.id) {
+        await updateUser(user);
+        addToast('User updated successfully!', 'success');
+      } else {
+        const userId = await addUser(user);
+        console.log('[UserManagementPage] User created with ID:', userId);
+        addToast('User created successfully!', 'success');
+      }
+      handleCloseModal();
+    } catch (error) {
+      console.error('[UserManagementPage] Error in handleFormSubmit:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Failed to save user';
+      addToast(errorMessage, 'error');
     }
-    handleCloseModal();
   };
 
-  const handleDelete = () => {
+  const handleDelete = async () => {
     if(userToDelete) {
-        deleteUser(userToDelete.id);
+      // Prevent deletion of the primary admin account
+      if (userToDelete.email === 'mail@jsabu.com') {
+        addToast('Cannot delete the primary admin account (mail@jsabu.com).', 'error');
+        handleCloseConfirm();
+        return;
+      }
+      
+      try {
+        await deleteUser(userToDelete.id);
         addToast(`User "${userToDelete.name}" deleted successfully.`, 'success');
         handleCloseConfirm();
+      } catch (error) {
+        console.error('[UserManagementPage] Error deleting user:', error);
+        const errorMessage = error instanceof Error ? error.message : 'Failed to delete user';
+        addToast(errorMessage, 'error');
+      }
     }
   };
 
@@ -114,11 +143,11 @@ const UserManagementPage: React.FC = () => {
                 placeholder="Search by name or email..."
                 value={searchQuery}
                 onChange={e => setSearchQuery(e.target.value)}
-                className="w-full sm:max-w-xs pl-3 sm:pl-4 pr-3 sm:pr-4 py-2 text-sm sm:text-base border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+                className="w-full sm:max-w-xs pl-3 sm:pl-4 pr-3 sm:pr-4 py-2 text-sm sm:text-base border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary text-gray-900 bg-white"
               />
               <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
                 <label htmlFor="role-filter" className="text-sm font-medium text-gray-700 whitespace-nowrap">Filter by role:</label>
-                <select id="role-filter" onChange={handleRoleFilterChange} value={roleFilter} className="w-full sm:w-auto pl-3 pr-8 sm:pr-10 py-2 text-sm sm:text-base border-gray-300 focus:outline-none focus:ring-primary focus:border-primary rounded-md">
+                <select id="role-filter" onChange={handleRoleFilterChange} value={roleFilter} className="w-full sm:w-auto pl-3 pr-8 sm:pr-10 py-2 text-sm sm:text-base border-gray-300 focus:outline-none focus:ring-primary focus:border-primary rounded-md text-gray-900 bg-white">
                   <option value="All">All Roles</option>
                   {Object.values(UserRole).map(role => (
                       <option key={role} value={role}>{role}</option>
@@ -136,18 +165,45 @@ const UserManagementPage: React.FC = () => {
                 <tr>
                   <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Name</th>
                   <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider hidden sm:table-cell">Email</th>
+                  <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider hidden md:table-cell">Contact / WhatsApp</th>
                   <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Roles</th>
                   <th className="px-3 sm:px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
-                {filteredUsers.map(user => (
+                {filteredUsers.map(user => {
+                  const fullContactNumber = user.countryCode && user.contactNumber 
+                    ? `${user.countryCode} ${user.contactNumber}` 
+                    : user.contactNumber || 'N/A';
+                  
+                  // Determine WhatsApp number display
+                  let whatsappDisplay = 'N/A';
+                  if (user.useSameAsContact !== false) {
+                    // If using same as contact (default behavior)
+                    whatsappDisplay = fullContactNumber;
+                  } else if (user.whatsappCountryCode && user.whatsappNumber) {
+                    // If different WhatsApp number is provided
+                    whatsappDisplay = `${user.whatsappCountryCode} ${user.whatsappNumber}`;
+                  }
+                  
+                  return (
                   <tr key={user.id}>
                     <td className="px-3 sm:px-6 py-3 sm:py-4">
                       <div className="text-sm font-medium text-gray-900">{user.name}</div>
                       <div className="text-xs text-gray-500 sm:hidden mt-1">{user.email}</div>
+                      {user.countryCode && user.contactNumber && (
+                        <div className="text-xs text-gray-500 sm:hidden mt-1">{fullContactNumber}</div>
+                      )}
                     </td>
                     <td className="px-3 sm:px-6 py-3 sm:py-4 whitespace-nowrap text-sm text-gray-500 hidden sm:table-cell">{user.email}</td>
+                    <td className="px-3 sm:px-6 py-3 sm:py-4 whitespace-nowrap text-sm text-gray-500 hidden md:table-cell">
+                      <div>{user.countryCode && user.contactNumber ? fullContactNumber : 'N/A'}</div>
+                      {whatsappDisplay !== 'N/A' && (
+                        <div className="text-xs text-gray-400 mt-1">
+                          <span className="font-medium">WhatsApp:</span> {whatsappDisplay}
+                        </div>
+                      )}
+                    </td>
                     <td className="px-3 sm:px-6 py-3 sm:py-4">
                       <div className="flex flex-wrap gap-1">
                         {user.roles.map(role => (
@@ -159,10 +215,20 @@ const UserManagementPage: React.FC = () => {
                     </td>
                     <td className="px-3 sm:px-6 py-3 sm:py-4 whitespace-nowrap text-right text-sm font-medium">
                       <button onClick={() => handleOpenEditModal(user)} className="text-primary hover:text-primary-dark p-1.5 sm:p-2 rounded-full hover:bg-gray-100"><EditIcon/></button>
-                      <button onClick={() => handleOpenConfirmModal(user)} className="ml-1 sm:ml-2 text-red-600 hover:text-red-800 p-1.5 sm:p-2 rounded-full hover:bg-gray-100"><DeleteIcon/></button>
+                      {user.email === 'mail@jsabu.com' ? (
+                        <button 
+                          disabled 
+                          title="Cannot delete primary admin account"
+                          className="ml-1 sm:ml-2 text-gray-400 cursor-not-allowed p-1.5 sm:p-2 rounded-full opacity-50"
+                        >
+                          <DeleteIcon/>
+                        </button>
+                      ) : (
+                        <button onClick={() => handleOpenConfirmModal(user)} className="ml-1 sm:ml-2 text-red-600 hover:text-red-800 p-1.5 sm:p-2 rounded-full hover:bg-gray-100"><DeleteIcon/></button>
+                      )}
                     </td>
                   </tr>
-                ))}
+                )})}
               </tbody>
             </table>
           </div>

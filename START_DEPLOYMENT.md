@@ -190,3 +190,7 @@ npx firebase-tools deploy --only hosting,firestore:rules
 
 🎉 **Your app will be live at: https://travelplan-grav.firebaseapp.com**
 
+
+
+
+

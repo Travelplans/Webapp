@@ -61,3 +61,7 @@ From `scripts/seedAuth.js`:
 - **Customer**: `customer@travelplans.fun` / `Customer@123`
 - **Relationship Manager**: `rm@travelplans.fun` / `RM@123`
 
+
+
+
+

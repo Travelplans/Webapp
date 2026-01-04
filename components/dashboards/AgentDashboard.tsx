@@ -19,7 +19,20 @@ const AgentDashboard: React.FC = () => {
   const [filterStatus, setFilterStatus] = useState<'All' | BookingStatus>('All');
   
   const agentItineraries = useMemo(() => {
-    return itineraries.filter(it => it.assignedAgentId === user?.id || !it.assignedAgentId)
+    if (!user?.id) return [];
+    
+    return itineraries.filter(it => {
+      // Check new format (assignedAgentIds array) - primary check
+      if (it.assignedAgentIds && Array.isArray(it.assignedAgentIds) && it.assignedAgentIds.length > 0) {
+        return it.assignedAgentIds.includes(user.id);
+      }
+      // Check old format (assignedAgentId) for backward compatibility
+      if (it.assignedAgentId) {
+        return it.assignedAgentId === user.id;
+      }
+      // If no assignment, agent cannot see it
+      return false;
+    });
   }, [user, itineraries]);
 
   useEffect(() => {

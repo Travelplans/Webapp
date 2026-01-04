@@ -1,14 +1,17 @@
 import React, { Component, ReactNode } from 'react';
 import { logger } from '../utils/logger';
+import { errorCache, shouldShowError } from '../utils/errorCache';
 
 interface Props {
   children: ReactNode;
   fallback?: ReactNode;
+  onError?: (error: Error, errorInfo: React.ErrorInfo) => void;
 }
 
 interface State {
   hasError: boolean;
   error: Error | null;
+  errorCount: number;
 }
 
 /**
@@ -21,28 +24,52 @@ export class ErrorBoundary extends Component<Props, State> {
     this.state = {
       hasError: false,
       error: null,
+      errorCount: 0,
     };
   }
 
   static getDerivedStateFromError(error: Error): State {
+    // Check if this error should be shown (not suppressed by cache)
+    const shouldShow = shouldShowError(error);
+    const errorCount = errorCache.getErrorCount(error) + 1;
+    
     return {
-      hasError: true,
-      error,
+      hasError: shouldShow, // Only show if not suppressed
+      error: shouldShow ? error : null,
+      errorCount,
     };
   }
 
   componentDidCatch(error: Error, errorInfo: React.ErrorInfo): void {
+    const errorCount = errorCache.getErrorCount(error);
+    
     logger.error('ErrorBoundary caught an error', {
       error: error.message,
       stack: error.stack,
       componentStack: errorInfo.componentStack,
+      errorCount: errorCount + 1,
     });
+
+    // Cache the error
+    errorCache.cacheError(error, 'A component error occurred. Please refresh the page.');
+
+    // Call custom error handler if provided
+    if (this.props.onError) {
+      this.props.onError(error, errorInfo);
+    }
   }
 
   handleReset = (): void => {
+    // Clear the specific error from cache on reset
+    if (this.state.error) {
+      // Note: We don't clear from cache here as it might be useful for debugging
+      // But we reset the component state
+    }
+    
     this.setState({
       hasError: false,
       error: null,
+      errorCount: 0,
     });
   };
 
@@ -78,9 +105,14 @@ export class ErrorBoundary extends Component<Props, State> {
             </p>
             {this.state.error && import.meta.env.DEV && (
               <div className="mb-4 p-3 bg-red-50 rounded border border-red-200">
-                <p className="text-sm text-red-800 font-mono">
+                <p className="text-sm text-red-800 font-mono mb-2">
                   {this.state.error.message}
                 </p>
+                {this.state.errorCount > 1 && (
+                  <p className="text-xs text-red-600">
+                    This error has occurred {this.state.errorCount} time(s)
+                  </p>
+                )}
               </div>
             )}
             <div className="flex gap-3">
@@ -107,4 +139,8 @@ export class ErrorBoundary extends Component<Props, State> {
 }
 
 export default ErrorBoundary;
+
+
+
+
 

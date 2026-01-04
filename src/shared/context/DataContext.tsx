@@ -1,6 +1,7 @@
-import React, { createContext, useState, useEffect, ReactNode } from 'react';
+import React, { createContext, useState, useEffect, ReactNode, useRef } from 'react';
 import { User, Itinerary, Customer, Booking, ItineraryCollateral, CustomerDocument, RecommendedItinerary } from '../types';
 import * as firestoreService from '../../services/firestore/firestoreService';
+import { useAuth } from '../hooks/useAuth';
 
 // AI Simulation Helpers
 const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
@@ -11,7 +12,7 @@ interface DataContextType {
   customers: Customer[];
   bookings: Booking[];
   loading: boolean;
-  addUser: (user: Omit<User, 'id'>) => Promise<void>;
+  addUser: (user: Omit<User, 'id'> & { password?: string }) => Promise<void>;
   updateUser: (user: User) => Promise<void>;
   deleteUser: (userId: string) => Promise<void>;
   addItinerary: (itinerary: Omit<Itinerary, 'id'>) => Promise<void>;
@@ -38,15 +39,38 @@ interface DataProviderProps {
 }
 
 export const DataProvider: React.FC<DataProviderProps> = ({ children }) => {
+  const { isAuthenticated, loading: authLoading, user } = useAuth();
   const [users, setUsers] = useState<User[]>([]);
   const [itineraries, setItineraries] = useState<Itinerary[]>([]);
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [loading, setLoading] = useState(true);
+  const subscriptionsRef = useRef<Array<() => void>>([]);
 
   // Subscribe to real-time Firestore updates
+  // Re-subscribe when authentication state changes
   useEffect(() => {
+    // Don't set up subscriptions until auth is ready
+    if (authLoading) {
+      return;
+    }
+
+    // If not authenticated, clear data and don't subscribe
+    if (!isAuthenticated) {
+      setUsers([]);
+      setItineraries([]);
+      setCustomers([]);
+      setBookings([]);
+      setLoading(false);
+      return;
+    }
+
+    console.log('[DataContext] Setting up subscriptions (authenticated:', isAuthenticated, ')');
     setLoading(true);
+
+    // Clean up any existing subscriptions
+    subscriptionsRef.current.forEach(unsubscribe => unsubscribe());
+    subscriptionsRef.current = [];
 
     let hasFired = {
       users: false,
@@ -58,60 +82,124 @@ export const DataProvider: React.FC<DataProviderProps> = ({ children }) => {
     const checkLoadingComplete = () => {
       // If all subscriptions have fired at least once, set loading to false
       if (hasFired.users && hasFired.itineraries && hasFired.customers && hasFired.bookings) {
+        console.log('[DataContext] All subscriptions have fired, setting loading to false');
         setLoading(false);
       }
     };
 
     const unsubscribeUsers = firestoreService.subscribeToUsers((updatedUsers) => {
+      console.log('[DataContext] Users subscription callback received:', {
+        count: updatedUsers.length,
+        ids: updatedUsers.map(u => u.id)
+      });
       setUsers(updatedUsers);
       if (!hasFired.users) {
         hasFired.users = true;
         checkLoadingComplete();
       }
     });
+    subscriptionsRef.current.push(unsubscribeUsers);
 
-    const unsubscribeItineraries = firestoreService.subscribeToItineraries((updatedItineraries) => {
-      setItineraries(updatedItineraries);
+    const unsubscribeItineraries = (user?.roles?.includes('Agent') && !user?.roles?.includes('Admin') && user?.id)
+      ? firestoreService.subscribeToItinerariesForAgent(user.id, (updatedItineraries) => {
+        console.log('[DataContext] Itineraries (agent) subscription callback received:', {
+          count: updatedItineraries.length,
+          ids: updatedItineraries.map(it => it.id),
+          titles: updatedItineraries.map(it => it.title),
+        });
+        setItineraries([...updatedItineraries]);
+        if (!hasFired.itineraries) {
+          hasFired.itineraries = true;
+          checkLoadingComplete();
+        }
+      })
+      : firestoreService.subscribeToItineraries((updatedItineraries) => {
+      console.log('[DataContext] Itineraries subscription callback received:', {
+        count: updatedItineraries.length,
+        ids: updatedItineraries.map(it => it.id),
+        titles: updatedItineraries.map(it => it.title),
+        assignedAgentIds: updatedItineraries.map(it => ({
+          id: it.id,
+          title: it.title,
+          assignedAgentIds: it.assignedAgentIds,
+          assignedAgentId: it.assignedAgentId
+        }))
+      });
+      // Force state update to ensure React re-renders
+      setItineraries([...updatedItineraries]);
       if (!hasFired.itineraries) {
         hasFired.itineraries = true;
         checkLoadingComplete();
       }
     });
+    subscriptionsRef.current.push(unsubscribeItineraries);
 
     const unsubscribeCustomers = firestoreService.subscribeToCustomers((updatedCustomers) => {
+      console.log('[DataContext] Customers subscription callback received:', {
+        count: updatedCustomers.length,
+        ids: updatedCustomers.map(c => c.id),
+        emails: updatedCustomers.map(c => c.email)
+      });
       setCustomers(updatedCustomers);
       if (!hasFired.customers) {
         hasFired.customers = true;
         checkLoadingComplete();
       }
     });
+    subscriptionsRef.current.push(unsubscribeCustomers);
 
     const unsubscribeBookings = firestoreService.subscribeToBookings((updatedBookings) => {
+      console.log('[DataContext] Bookings subscription callback received:', {
+        count: updatedBookings.length,
+        ids: updatedBookings.map(b => b.id),
+        customerIds: updatedBookings.map(b => b.customerId)
+      });
       setBookings(updatedBookings);
       if (!hasFired.bookings) {
         hasFired.bookings = true;
         checkLoadingComplete();
       }
     });
+    subscriptionsRef.current.push(unsubscribeBookings);
 
-    // Fallback: Set loading to false after max 1 second to prevent blocking
+    // Fallback: Set loading to false after max 2 seconds to prevent blocking
     // This ensures pages render even if subscriptions are slow
     const fallbackTimer = setTimeout(() => {
+      console.log('[DataContext] Fallback timer fired - setting loading to false');
       setLoading(false);
-    }, 1000);
+    }, 2000);
 
-    // Cleanup subscriptions on unmount
+    // Cleanup subscriptions on unmount or when auth state changes
     return () => {
-      unsubscribeUsers();
-      unsubscribeItineraries();
-      unsubscribeCustomers();
-      unsubscribeBookings();
+      console.log('[DataContext] Cleaning up subscriptions');
+      subscriptionsRef.current.forEach(unsubscribe => unsubscribe());
+      subscriptionsRef.current = [];
       clearTimeout(fallbackTimer);
     };
-  }, []);
+  }, [isAuthenticated, authLoading, user?.id, user?.roles]);
+
+  // Manual refresh function to force data reload
+  // Note: Subscriptions should handle updates automatically, but this can be used as a fallback
+  const refreshData = async () => {
+    if (!isAuthenticated) {
+      console.log('[DataContext] Cannot refresh - not authenticated');
+      return;
+    }
+
+    console.log('[DataContext] Manual refresh triggered - subscriptions should handle this automatically');
+    // The subscriptions will automatically update the data when Firestore changes
+    // This function is mainly for debugging or forcing a re-check
+    // We can trigger a re-subscription by temporarily clearing and re-setting
+    setLoading(true);
+    
+    // Small delay to allow subscriptions to catch up
+    setTimeout(() => {
+      setLoading(false);
+    }, 500);
+  };
 
   // --- CRUD Functions ---
-  const addUser = async (user: Omit<User, 'id'>) => {
+  const addUser = async (user: Omit<User, 'id'> & { password?: string }) => {
     try {
       await firestoreService.addUser(user);
     } catch (error) {
@@ -132,6 +220,12 @@ export const DataProvider: React.FC<DataProviderProps> = ({ children }) => {
 
   const deleteUser = async (userId: string) => {
     try {
+      // Prevent deletion of the primary admin account
+      const user = users.find(u => u.id === userId);
+      if (user && user.email === 'mail@jsabu.com') {
+        throw new Error('Cannot delete the primary admin account (mail@jsabu.com).');
+      }
+      
       await firestoreService.deleteUser(userId);
     } catch (error) {
       console.error('Error deleting user:', error);
@@ -141,16 +235,52 @@ export const DataProvider: React.FC<DataProviderProps> = ({ children }) => {
 
   const addItinerary = async (itinerary: Omit<Itinerary, 'id'>) => {
     try {
-      const itineraryData = {
-        ...itinerary,
+      console.log('[DataContext] Adding itinerary:', { 
+        title: itinerary.title, 
+        destination: itinerary.destination,
+        hasAssignedAgentId: !!itinerary.assignedAgentId 
+      });
+      
+      // Build itinerary data explicitly, excluding id and undefined values
+      const itineraryData: any = {
+        title: itinerary.title,
+        destination: itinerary.destination,
+        duration: itinerary.duration,
+        price: itinerary.price,
         description: itinerary.description || '',
-        assignedAgentId: itinerary.assignedAgentId || undefined,
         imageUrl: itinerary.imageUrl || 'https://images.unsplash.com/photo-1501785888041-af3ef285b470?q=80&w=2070',
         collaterals: itinerary.collaterals || [],
       };
+      
+      // Include dailyPlan if it exists (for AI-generated itineraries)
+      if (itinerary.dailyPlan && Array.isArray(itinerary.dailyPlan) && itinerary.dailyPlan.length > 0) {
+        itineraryData.dailyPlan = itinerary.dailyPlan;
+      }
+      
+      // Support both old (assignedAgentId) and new (assignedAgentIds) format
+      if (itinerary.assignedAgentIds && Array.isArray(itinerary.assignedAgentIds) && itinerary.assignedAgentIds.length > 0) {
+        itineraryData.assignedAgentIds = itinerary.assignedAgentIds;
+      } else if (itinerary.assignedAgentId) {
+        // Migrate from old format to new format
+        itineraryData.assignedAgentIds = [itinerary.assignedAgentId];
+        itineraryData.assignedAgentId = itinerary.assignedAgentId; // Keep for backward compatibility
+      }
+      
+      // Final safety check - remove any undefined or null values (shouldn't be any, but just in case)
+      Object.keys(itineraryData).forEach(key => {
+        if (itineraryData[key] === undefined || itineraryData[key] === null) {
+          delete itineraryData[key];
+        }
+      });
+      
+      // Explicitly ensure id is not included
+      delete itineraryData.id;
+      
+      console.log('[DataContext] Cleaned itinerary data:', itineraryData);
       await firestoreService.addItinerary(itineraryData);
+      console.log('[DataContext] Itinerary added successfully');
     } catch (error) {
-      console.error('Error adding itinerary:', error);
+      console.error('[DataContext] Error adding itinerary:', error);
       throw error;
     }
   };
@@ -176,13 +306,39 @@ export const DataProvider: React.FC<DataProviderProps> = ({ children }) => {
 
   const addCustomer = async (customer: Omit<Customer, 'id' | 'bookingStatus' | 'documents' | 'registrationDate'>) => {
     try {
-      const customerData = {
-        ...customer,
-        assignedRmId: customer.assignedRmId || undefined,
+      console.log('[DataContext] Adding customer:', { 
+        firstName: customer.firstName, 
+        lastName: customer.lastName,
+        email: customer.email,
+        hasAssignedRmId: !!customer.assignedRmId 
+      });
+      
+      // Remove undefined values - Firestore doesn't allow undefined
+      const customerData: any = {
+        firstName: customer.firstName,
+        lastName: customer.lastName,
+        email: customer.email,
+        dob: customer.dob,
+        registeredByAgentId: customer.registeredByAgentId,
       };
+      
+      // Only include assignedRmId if it has a truthy value
+      if (customer.assignedRmId) {
+        customerData.assignedRmId = customer.assignedRmId;
+      }
+      
+      // Remove any undefined values (safety check)
+      Object.keys(customerData).forEach(key => {
+        if (customerData[key] === undefined || customerData[key] === null) {
+          delete customerData[key];
+        }
+      });
+      
+      console.log('[DataContext] Cleaned customer data:', customerData);
       await firestoreService.addCustomer(customerData);
+      console.log('[DataContext] Customer added successfully');
     } catch (error) {
-      console.error('Error adding customer:', error);
+      console.error('[DataContext] Error adding customer:', error);
       throw error;
     }
   };
@@ -352,6 +508,7 @@ export const DataProvider: React.FC<DataProviderProps> = ({ children }) => {
 
   const value = {
     users, itineraries, customers, bookings, loading,
+    refreshData,
     addUser, updateUser, deleteUser,
     addItinerary, updateItinerary, deleteItinerary,
     addCustomer, updateCustomer, addDocumentToCustomer,

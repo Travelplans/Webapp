@@ -57,15 +57,20 @@ const ItinerariesPage: React.FC = () => {
     setItineraryToDelete(null);
   };
 
-  const handleFormSubmit = (itinerary: Itinerary) => {
-    if (itinerary.id) {
-      updateItinerary(itinerary);
-      addToast('Itinerary updated successfully!', 'success');
-    } else {
-      addItinerary(itinerary);
-      addToast('Itinerary created successfully!', 'success');
+  const handleFormSubmit = async (itinerary: Itinerary | Omit<Itinerary, 'id'>) => {
+    try {
+      if ('id' in itinerary && itinerary.id) {
+        await updateItinerary(itinerary as Itinerary);
+        addToast('Itinerary updated successfully!', 'success');
+      } else {
+        await addItinerary(itinerary as Omit<Itinerary, 'id'>);
+        addToast('Itinerary created successfully!', 'success');
+      }
+      handleCloseModal();
+    } catch (error) {
+      console.error('Error saving itinerary:', error);
+      addToast('Failed to save itinerary. Please try again.', 'error');
     }
-    handleCloseModal();
   };
 
   const handleDelete = () => {

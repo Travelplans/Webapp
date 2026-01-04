@@ -1,0 +1,424 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Create Test Agent for Walkthrough</title>
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 50px auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #333;
+            margin-bottom: 10px;
+        }
+        .subtitle {
+            color: #666;
+            margin-bottom: 30px;
+        }
+        .credentials {
+            background: #f8f9fa;
+            padding: 20px;
+            border-radius: 6px;
+            margin: 20px 0;
+            border-left: 4px solid #007bff;
+        }
+        .credentials h3 {
+            margin-top: 0;
+            color: #007bff;
+        }
+        .credentials code {
+            display: block;
+            background: white;
+            padding: 10px;
+            border-radius: 4px;
+            margin: 5px 0;
+            font-size: 14px;
+        }
+        button {
+            background: #007bff;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 6px;
+            font-size: 16px;
+            cursor: pointer;
+            margin: 10px 5px;
+        }
+        button:hover {
+            background: #0056b3;
+        }
+        button:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+        .status {
+            margin: 20px 0;
+            padding: 15px;
+            border-radius: 6px;
+        }
+        .status.success {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        .status.error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+        .status.info {
+            background: #d1ecf1;
+            color: #0c5460;
+            border: 1px solid #bee5eb;
+        }
+        .step {
+            margin: 20px 0;
+            padding: 15px;
+            background: #f8f9fa;
+            border-radius: 6px;
+        }
+        .step h4 {
+            margin-top: 0;
+            color: #333;
+        }
+        .login-form {
+            margin: 20px 0;
+        }
+        .login-form input {
+            width: 100%;
+            padding: 10px;
+            margin: 10px 0;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            box-sizing: border-box;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🚀 Create Test Agent for Walkthrough</h1>
+        <p class="subtitle">This script will create a test agent account with sample data for testing all application features.</p>
+
+        <div id="loginSection" class="step">
+            <h4>Step 1: Login as Admin</h4>
+            <p>You need to be logged in as an admin to create the test agent.</p>
+            <div class="login-form">
+                <input type="email" id="adminEmail" placeholder="Admin Email (e.g., mail@jsabu.com)" value="mail@jsabu.com">
+                <input type="password" id="adminPassword" placeholder="Admin Password" value="Admin123">
+                <button onclick="loginAsAdmin()">Login as Admin</button>
+            </div>
+        </div>
+
+        <div id="createSection" style="display: none;">
+            <div class="credentials">
+                <h3>📋 Test Agent Credentials</h3>
+                <strong>Email:</strong> <code>testagent@travelplans.fun</code>
+                <strong>Password:</strong> <code>TestAgent@123</code>
+                <strong>Login URL:</strong> <code>https://travelplan-grav.web.app/login</code>
+            </div>
+
+            <div class="step">
+                <h4>Step 2: Create Test Agent & Sample Data</h4>
+                <p>This will create:</p>
+                <ul>
+                    <li>✅ Test Agent user account</li>
+                    <li>✅ 3 Sample Itineraries (assigned to agent)</li>
+                    <li>✅ 3 Sample Customers (registered by agent)</li>
+                    <li>✅ 3 Sample Bookings</li>
+                </ul>
+                <button onclick="createTestAgent()" id="createBtn">Create Test Agent & Data</button>
+            </div>
+        </div>
+
+        <div id="status"></div>
+    </div>
+
+    <script>
+        // Firebase configuration
+        const firebaseConfig = {
+            apiKey: "AIzaSyD0HAe0Q7ZNDIoAME0-iP-1Xwa_SzmgSvU",
+            authDomain: "travelplan-grav.firebaseapp.com",
+            projectId: "travelplan-grav",
+            storageBucket: "travelplan-grav.firebasestorage.app",
+            messagingSenderId: "848531208932",
+            appId: "1:848531208932:web:28bbab98766f81a553caf1"
+        };
+
+        firebase.initializeApp(firebaseConfig);
+        const auth = firebase.auth();
+        const db = firebase.firestore();
+
+        const API_BASE_URL = 'https://us-central1-travelplan-grav.cloudfunctions.net/api';
+
+        async function loginAsAdmin() {
+            const email = document.getElementById('adminEmail').value;
+            const password = document.getElementById('adminPassword').value;
+            
+            showStatus('info', 'Logging in as admin...');
+            
+            try {
+                await auth.signInWithEmailAndPassword(email, password);
+                const user = auth.currentUser;
+                const token = await user.getIdToken();
+                
+                // Verify admin role
+                const userDoc = await db.collection('users').doc(user.uid).get();
+                const userData = userDoc.data();
+                
+                if (!userData || !userData.roles || !userData.roles.includes('Admin')) {
+                    showStatus('error', 'Error: This account is not an admin. Please use an admin account.');
+                    await auth.signOut();
+                    return;
+                }
+                
+                showStatus('success', '✅ Successfully logged in as admin!');
+                document.getElementById('loginSection').style.display = 'none';
+                document.getElementById('createSection').style.display = 'block';
+            } catch (error) {
+                showStatus('error', 'Login failed: ' + error.message);
+            }
+        }
+
+        async function createTestAgent() {
+            const btn = document.getElementById('createBtn');
+            btn.disabled = true;
+            btn.textContent = 'Creating...';
+
+            showStatus('info', '🚀 Creating test agent and sample data...');
+
+            try {
+                const user = auth.currentUser;
+                if (!user) {
+                    throw new Error('Not logged in');
+                }
+
+                const token = await user.getIdToken();
+
+                // Step 1: Create the agent user via Cloud Function
+                showStatus('info', 'Step 1/4: Creating test agent user...');
+                const createUserResponse = await fetch(`${API_BASE_URL}/createUser`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${token}`
+                    },
+                    body: JSON.stringify({
+                        email: 'testagent@travelplans.fun',
+                        password: 'TestAgent@123',
+                        name: 'Test Agent (Walkthrough)',
+                        countryCode: '+971',
+                        contactNumber: '501234567',
+                        roles: ['Agent']
+                    })
+                });
+
+                if (!createUserResponse.ok) {
+                    const error = await createUserResponse.json();
+                    throw new Error(error.error || 'Failed to create user');
+                }
+
+                const userData = await createUserResponse.json();
+                const agentId = userData.data.uid;
+                showStatus('success', `✅ Created test agent: ${agentId}`);
+
+                // Step 2: Create sample itineraries
+                showStatus('info', 'Step 2/4: Creating sample itineraries...');
+                const itineraries = [
+                    {
+                        title: 'Dubai Luxury Experience',
+                        destination: 'Dubai, UAE',
+                        duration: 5,
+                        price: 15000,
+                        description: 'Experience the luxury and opulence of Dubai with world-class hotels, fine dining, and exclusive experiences.',
+                        imageUrl: 'https://images.unsplash.com/photo-1512453979798-5ea266f8880c?q=80&w=2070',
+                        assignedAgentIds: [agentId],
+                        collaterals: [],
+                        dailyPlan: [
+                            { day: 1, title: 'Arrival & Burj Khalifa', activities: 'Arrive at Dubai International Airport. Transfer to luxury hotel. Evening visit to Burj Khalifa with dinner at At.mosphere restaurant.' },
+                            { day: 2, title: 'Desert Safari', activities: 'Morning at leisure. Afternoon desert safari with camel riding, sandboarding, and traditional BBQ dinner.' },
+                            { day: 3, title: 'Palm Jumeirah & Atlantis', activities: 'Visit Palm Jumeirah and Atlantis The Palm. Enjoy Aquaventure Waterpark.' },
+                            { day: 4, title: 'Dubai Mall & Gold Souk', activities: 'Shopping at Dubai Mall. Visit Gold Souk. Evening Dhow cruise with dinner.' },
+                            { day: 5, title: 'Departure', activities: 'Last minute shopping or spa treatment. Transfer to airport.' }
+                        ]
+                    },
+                    {
+                        title: 'Paris Romantic Getaway',
+                        destination: 'Paris, France',
+                        duration: 7,
+                        price: 25000,
+                        description: 'A romantic journey through the City of Light, featuring iconic landmarks, world-class museums, and intimate dining experiences.',
+                        imageUrl: 'https://images.unsplash.com/photo-1502602898657-3e91760cbb34?q=80&w=2073',
+                        assignedAgentIds: [agentId],
+                        collaterals: [],
+                        dailyPlan: [
+                            { day: 1, title: 'Arrival in Paris', activities: 'Arrive at Charles de Gaulle Airport. Transfer to boutique hotel in Montmartre.' },
+                            { day: 2, title: 'Eiffel Tower & Seine Cruise', activities: 'Morning visit to Eiffel Tower. Afternoon Seine River cruise.' },
+                            { day: 3, title: 'Louvre Museum', activities: 'Full day at Louvre Museum with private guide.' },
+                            { day: 4, title: 'Versailles Day Trip', activities: 'Day trip to Palace of Versailles with audio guide.' },
+                            { day: 5, title: 'Notre-Dame & Latin Quarter', activities: 'Visit Notre-Dame Cathedral. Explore Latin Quarter.' },
+                            { day: 6, title: 'Montmartre & Art District', activities: 'Morning at Montmartre with artist square. Visit Sacré-Cœur Basilica.' },
+                            { day: 7, title: 'Departure', activities: 'Last minute souvenir shopping. Transfer to airport.' }
+                        ]
+                    },
+                    {
+                        title: 'Bali Tropical Paradise',
+                        destination: 'Bali, Indonesia',
+                        duration: 10,
+                        price: 18000,
+                        description: 'Discover the beauty of Bali with pristine beaches, ancient temples, lush rice terraces, and world-renowned spa treatments.',
+                        imageUrl: 'https://images.unsplash.com/photo-1518548419970-58e3b4079ab2?q=80&w=2070',
+                        assignedAgentIds: [agentId],
+                        collaterals: [],
+                        dailyPlan: [
+                            { day: 1, title: 'Arrival in Bali', activities: 'Arrive at Ngurah Rai Airport. Transfer to beachfront resort in Seminyak.' },
+                            { day: 2, title: 'Ubud Cultural Tour', activities: 'Day trip to Ubud. Visit Tegalalang Rice Terraces and Ubud Monkey Forest.' },
+                            { day: 3, title: 'Water Sports & Beach Day', activities: 'Full day at beach resort. Enjoy water sports and spa treatment.' },
+                            { day: 4, title: 'Temple Tour', activities: 'Visit Tanah Lot Temple and Uluwatu Temple. Watch Kecak fire dance at sunset.' },
+                            { day: 5, title: 'Volcano & Hot Springs', activities: 'Early morning Mount Batur sunrise trek. Visit hot springs.' }
+                        ]
+                    }
+                ];
+
+                const itineraryIds = [];
+                for (const itinerary of itineraries) {
+                    const docRef = await db.collection('itineraries').add(itinerary);
+                    itineraryIds.push(docRef.id);
+                }
+                showStatus('success', `✅ Created ${itineraries.length} sample itineraries`);
+
+                // Step 3: Create sample customers
+                showStatus('info', 'Step 3/4: Creating sample customers...');
+                const customers = [
+                    {
+                        firstName: 'John',
+                        lastName: 'Smith',
+                        email: 'john.smith@example.com',
+                        dob: '1985-05-15',
+                        registrationDate: new Date().toISOString(),
+                        registeredByAgentId: agentId,
+                        bookingStatus: 'Confirmed',
+                        documents: []
+                    },
+                    {
+                        firstName: 'Sarah',
+                        lastName: 'Johnson',
+                        email: 'sarah.johnson@example.com',
+                        dob: '1990-08-22',
+                        registrationDate: new Date().toISOString(),
+                        registeredByAgentId: agentId,
+                        bookingStatus: 'Pending',
+                        documents: []
+                    },
+                    {
+                        firstName: 'Michael',
+                        lastName: 'Brown',
+                        email: 'michael.brown@example.com',
+                        dob: '1988-12-10',
+                        registrationDate: new Date().toISOString(),
+                        registeredByAgentId: agentId,
+                        bookingStatus: 'Completed',
+                        documents: []
+                    }
+                ];
+
+                const customerIds = [];
+                for (const customer of customers) {
+                    const docRef = await db.collection('customers').add(customer);
+                    customerIds.push(docRef.id);
+                }
+                showStatus('success', `✅ Created ${customers.length} sample customers`);
+
+                // Step 4: Create sample bookings
+                showStatus('info', 'Step 4/4: Creating sample bookings...');
+                const bookings = [
+                    {
+                        customerId: customerIds[0],
+                        itineraryId: itineraryIds[0],
+                        bookingDate: new Date().toISOString(),
+                        status: 'Confirmed',
+                        paymentStatus: 'Paid'
+                    },
+                    {
+                        customerId: customerIds[1],
+                        itineraryId: itineraryIds[1],
+                        bookingDate: new Date().toISOString(),
+                        status: 'Pending',
+                        paymentStatus: 'Unpaid'
+                    },
+                    {
+                        customerId: customerIds[2],
+                        itineraryId: itineraryIds[2],
+                        bookingDate: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString(),
+                        status: 'Completed',
+                        paymentStatus: 'Paid'
+                    }
+                ];
+
+                for (const booking of bookings) {
+                    await db.collection('bookings').add(booking);
+                }
+                showStatus('success', `✅ Created ${bookings.length} sample bookings`);
+
+                // Final success message
+                showStatus('success', `
+                    <h3>🎉 Test Agent Setup Complete!</h3>
+                    <p><strong>Test Agent Credentials:</strong></p>
+                    <p>Email: <code>testagent@travelplans.fun</code></p>
+                    <p>Password: <code>TestAgent@123</code></p>
+                    <p><a href="https://travelplan-grav.web.app/login" target="_blank" style="color: #007bff;">👉 Login to Test Application</a></p>
+                    <p><strong>Sample Data Created:</strong></p>
+                    <ul>
+                        <li>✅ 3 Itineraries (with full day-by-day plans)</li>
+                        <li>✅ 3 Customers</li>
+                        <li>✅ 3 Bookings</li>
+                    </ul>
+                `);
+
+                btn.disabled = false;
+                btn.textContent = 'Create Test Agent & Data';
+            } catch (error) {
+                showStatus('error', '❌ Error: ' + error.message);
+                btn.disabled = false;
+                btn.textContent = 'Create Test Agent & Data';
+            }
+        }
+
+        function showStatus(type, message) {
+            const statusDiv = document.getElementById('status');
+            statusDiv.className = 'status ' + type;
+            statusDiv.innerHTML = message;
+        }
+
+        // Check if already logged in
+        auth.onAuthStateChanged((user) => {
+            if (user) {
+                db.collection('users').doc(user.uid).get().then((doc) => {
+                    const userData = doc.data();
+                    if (userData && userData.roles && userData.roles.includes('Admin')) {
+                        document.getElementById('loginSection').style.display = 'none';
+                        document.getElementById('createSection').style.display = 'block';
+                        showStatus('info', 'Already logged in as admin');
+                    }
+                });
+            }
+        });
+    </script>
+</body>
+</html>
+
+
+

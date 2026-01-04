@@ -22,6 +22,8 @@ const CompliancePage = lazy(() => import('../features/compliance/pages/Complianc
 const DocumentsPage = lazy(() => import('../features/customers/pages/DocumentsPage'));
 const BookingsPage = lazy(() => import('../features/bookings/pages/BookingsPage'));
 const GenerateItineraryPage = lazy(() => import('../features/ai/pages/GenerateItineraryPage'));
+const WhatsAppMessagingPage = lazy(() => import('../features/users/pages/WhatsAppMessagingPage'));
+const APISettingsPage = lazy(() => import('../features/settings/pages/APISettingsPage'));
 
 // Loading component
 const LoadingSpinner = () => (
@@ -77,6 +79,18 @@ const AppRoutes: React.FC = () => {
           path="/generate-itinerary" 
           element={
             user.roles.includes(UserRole.ADMIN) ? <GenerateItineraryPage /> : <Navigate to="/" />
+          } 
+        />
+        <Route 
+          path="/whatsapp" 
+          element={
+            user.roles.includes(UserRole.ADMIN) ? <WhatsAppMessagingPage /> : <Navigate to="/" />
+          } 
+        />
+        <Route 
+          path="/settings" 
+          element={
+            user.roles.includes(UserRole.ADMIN) ? <APISettingsPage /> : <Navigate to="/" />
           } 
         />
         <Route path="*" element={<Navigate to="/" />} />

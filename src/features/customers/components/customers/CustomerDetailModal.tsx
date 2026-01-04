@@ -61,25 +61,37 @@ const CustomerDetailModal: React.FC<CustomerDetailModalProps> = ({ customer, onC
     }
   };
   
-  const handleUpload = () => {
+  const handleUpload = async () => {
     if (selectedFiles.length > 0) {
-      const fileCount = selectedFiles.length;
-      selectedFiles.forEach(file => {
-        const docType = file.name.split('.').pop()?.toUpperCase() as CustomerDocument['type'] || 'DOCX';
-        addDocumentToCustomer(customer.id, {
-          name: file.name,
-          type: ['PDF', 'DOCX', 'JPG', 'PNG'].includes(docType) ? docType : 'DOCX',
-          uploadDate: new Date().toISOString().split('T')[0],
+      try {
+        const fileCount = selectedFiles.length;
+        const uploadPromises = selectedFiles.map(file => {
+          const docType = file.name.split('.').pop()?.toUpperCase() as CustomerDocument['type'] || 'DOCX';
+          return addDocumentToCustomer(customer.id, {
+            name: file.name,
+            type: ['PDF', 'DOCX', 'JPG', 'PNG'].includes(docType) ? docType : 'DOCX',
+            uploadDate: new Date().toISOString().split('T')[0],
+          });
         });
-      });
-      setSelectedFiles([]);
-      addToast(`${fileCount} document(s) uploaded successfully.`, 'success');
+        
+        await Promise.all(uploadPromises);
+        setSelectedFiles([]);
+        addToast(`${fileCount} document(s) uploaded successfully.`, 'success');
+      } catch (error) {
+        console.error('Error uploading documents:', error);
+        addToast('Failed to upload document(s). Please try again.', 'error');
+      }
     }
   };
   
-  const handleSaveRmAssignment = () => {
-    updateCustomer({ ...customer, assignedRmId: assignedRmId || undefined });
-    addToast("Relationship Manager updated successfully.", 'success');
+  const handleSaveRmAssignment = async () => {
+    try {
+      await updateCustomer({ ...customer, assignedRmId: assignedRmId || undefined });
+      addToast("Relationship Manager updated successfully.", 'success');
+    } catch (error) {
+      console.error('Error updating RM assignment:', error);
+      addToast('Failed to update Relationship Manager. Please try again.', 'error');
+    }
   };
 
   const handleDownload = (doc: CustomerDocument) => {
@@ -97,16 +109,29 @@ const CustomerDetailModal: React.FC<CustomerDetailModalProps> = ({ customer, onC
 
   const handleGenerateSummary = async () => {
     setIsSummaryLoading(true);
-    const result = await generateCustomerSummary(customer);
-    setSummary(result);
-    setIsSummaryLoading(false);
+    try {
+      const result = await generateCustomerSummary(customer);
+      setSummary(result);
+      addToast('Customer summary generated successfully.', 'success');
+    } catch (error) {
+      console.error('Error generating summary:', error);
+      addToast('Failed to generate customer summary. Please try again.', 'error');
+    } finally {
+      setIsSummaryLoading(false);
+    }
   };
 
   const handleVerifyDocument = async (docId: string) => {
     setVerifyingDocId(docId);
-    await verifyDocumentWithAi(customer.id, docId);
-    setVerifyingDocId(null);
-    addToast("Document verification completed.", 'success');
+    try {
+      await verifyDocumentWithAi(customer.id, docId);
+      addToast("Document verification completed.", 'success');
+    } catch (error) {
+      console.error('Error verifying document:', error);
+      addToast('Failed to verify document. Please try again.', 'error');
+    } finally {
+      setVerifyingDocId(null);
+    }
   }
 
   const VerificationStatusBadge: React.FC<{ status?: CustomerDocument['verifiedStatus'] }> = ({ status }) => {

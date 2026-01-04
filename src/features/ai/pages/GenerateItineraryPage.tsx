@@ -47,7 +47,14 @@ const GenerateItineraryPage: React.FC = () => {
 
         } catch (err) {
             console.error("AI generation failed:", err);
-            setError(err instanceof Error ? err.message : "Failed to generate itinerary. Please try again.");
+            let errorMessage = err instanceof Error ? err.message : "Failed to generate itinerary. Please try again.";
+            
+            // Provide helpful guidance for Cloud Function connection errors
+            if (errorMessage.includes("Cannot connect to Cloud Function")) {
+                errorMessage = `${errorMessage}\n\nTo fix this, deploy the Cloud Functions by running:\nnpm run deploy:functions\n\nSee DEPLOY_FUNCTIONS.md for detailed instructions.`;
+            }
+            
+            setError(errorMessage);
         } finally {
             setIsLoading(false);
         }
@@ -80,6 +87,7 @@ const GenerateItineraryPage: React.FC = () => {
             duration: Number(duration),
             price: generatedPlan.price,
             description: generatedPlan.description,
+            dailyPlan: generatedPlan.dailyPlan || [], // Save the full day-by-day plan
             imageUrl: generatedImage,
             collaterals: [],
         });
@@ -97,15 +105,15 @@ const GenerateItineraryPage: React.FC = () => {
                             <form onSubmit={handleGenerate} className="space-y-4">
                                 <div>
                                     <label htmlFor="destination" className="block text-sm font-medium text-gray-700">Destination</label>
-                                    <input type="text" id="destination" value={destination} onChange={e => setDestination(e.target.value)} required className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-primary focus:border-primary sm:text-sm" />
+                                    <input type="text" id="destination" value={destination} onChange={e => setDestination(e.target.value)} required className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-primary focus:border-primary sm:text-sm text-gray-900 bg-white" />
                                 </div>
                                 <div>
                                     <label htmlFor="duration" className="block text-sm font-medium text-gray-700">Duration (days)</label>
-                                    <input type="number" id="duration" value={duration} onChange={e => setDuration(e.target.value)} required min="1" className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-primary focus:border-primary sm:text-sm" />
+                                    <input type="number" id="duration" value={duration} onChange={e => setDuration(e.target.value)} required min="1" className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-primary focus:border-primary sm:text-sm text-gray-900 bg-white" />
                                 </div>
                                 <div>
                                     <label htmlFor="travelerType" className="block text-sm font-medium text-gray-700">Traveler Type</label>
-                                    <select id="travelerType" value={travelerType} onChange={e => setTravelerType(e.target.value)} className="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-primary focus:border-primary sm:text-sm rounded-md">
+                                    <select id="travelerType" value={travelerType} onChange={e => setTravelerType(e.target.value)} className="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-primary focus:border-primary sm:text-sm rounded-md text-gray-900 bg-white">
                                         <option>Couple</option>
                                         <option>Family with kids</option>
                                         <option>Solo traveler</option>
@@ -115,7 +123,7 @@ const GenerateItineraryPage: React.FC = () => {
                                 </div>
                                 <div>
                                     <label htmlFor="budget" className="block text-sm font-medium text-gray-700">Budget</label>
-                                    <select id="budget" value={budget} onChange={e => setBudget(e.target.value)} className="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-primary focus:border-primary sm:text-sm rounded-md">
+                                    <select id="budget" value={budget} onChange={e => setBudget(e.target.value)} className="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-primary focus:border-primary sm:text-sm rounded-md text-gray-900 bg-white">
                                         <option>Budget</option>
                                         <option>Mid-range</option>
                                         <option>Luxury</option>
@@ -141,7 +149,23 @@ const GenerateItineraryPage: React.FC = () => {
                                     <p className="mt-2 text-sm text-gray-500">This might take a moment. The AI is crafting the perfect trip!</p>
                                 </div>
                             )}
-                            {error && <p className="text-red-500 text-center my-4">{error}</p>}
+                            {error && (
+                                <div className="bg-red-50 border border-red-200 rounded-lg p-4 my-4">
+                                    <p className="text-red-800 font-semibold mb-2">Error generating itinerary:</p>
+                                    <p className="text-red-700 text-sm whitespace-pre-wrap">{error}</p>
+                                    {error.includes("Cannot connect to Cloud Function") && (
+                                        <div className="mt-3 p-3 bg-yellow-50 border border-yellow-200 rounded">
+                                            <p className="text-yellow-800 text-sm font-semibold mb-1">Quick Fix:</p>
+                                            <code className="text-xs text-yellow-900 block bg-yellow-100 p-2 rounded">
+                                                npm run deploy:functions
+                                            </code>
+                                            <p className="text-yellow-700 text-xs mt-2">
+                                                See DEPLOY_FUNCTIONS.md for detailed deployment instructions.
+                                            </p>
+                                        </div>
+                                    )}
+                                </div>
+                            )}
                             {generatedPlan && (
                                 <div className="space-y-6">
                                     {generatedImage && <img src={generatedImage} alt={generatedPlan.title} className="w-full h-64 object-cover rounded-lg shadow-md" />}
@@ -164,17 +188,19 @@ const GenerateItineraryPage: React.FC = () => {
                                         </div>
                                     </div>
                                     <p className="text-gray-700">{generatedPlan.description}</p>
-                                    <div className="border-t pt-4">
-                                        <h3 className="text-xl font-semibold text-gray-800 mb-4">Daily Plan</h3>
-                                        <div className="space-y-4">
-                                            {generatedPlan.dailyPlan.map(day => (
-                                                <div key={day.day} className="p-4 bg-gray-50 rounded-lg">
-                                                    <p className="font-bold text-primary">Day {day.day}: {day.title}</p>
-                                                    <p className="mt-1 text-sm text-gray-600">{day.activities}</p>
-                                                </div>
-                                            ))}
+                                    {generatedPlan.dailyPlan && Array.isArray(generatedPlan.dailyPlan) && generatedPlan.dailyPlan.length > 0 && (
+                                        <div className="border-t pt-4">
+                                            <h3 className="text-xl font-semibold text-gray-800 mb-4">Daily Plan</h3>
+                                            <div className="space-y-4">
+                                                {generatedPlan.dailyPlan.map((day, index) => (
+                                                    <div key={day.day || index} className="p-4 bg-gray-50 rounded-lg">
+                                                        <p className="font-bold text-primary">Day {day.day}: {day.title}</p>
+                                                        <p className="mt-1 text-sm text-gray-600">{day.activities}</p>
+                                                    </div>
+                                                ))}
+                                            </div>
                                         </div>
-                                    </div>
+                                    )}
                                 </div>
                             )}
                              {!isLoading && !generatedPlan && !error && (
@@ -191,4 +217,6 @@ const GenerateItineraryPage: React.FC = () => {
 };
 
 export default GenerateItineraryPage;
+
+
 

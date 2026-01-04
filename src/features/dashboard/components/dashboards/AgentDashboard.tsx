@@ -19,7 +19,20 @@ const AgentDashboard: React.FC = () => {
   const [filterStatus, setFilterStatus] = useState<'All' | BookingStatus>('All');
   
   const agentItineraries = useMemo(() => {
-    return itineraries.filter(it => it.assignedAgentId === user?.id || !it.assignedAgentId)
+    if (!user?.id) return [];
+    
+    return itineraries.filter(it => {
+      // Check new format (assignedAgentIds array) - primary check
+      if (it.assignedAgentIds && Array.isArray(it.assignedAgentIds) && it.assignedAgentIds.length > 0) {
+        return it.assignedAgentIds.includes(user.id);
+      }
+      // Check old format (assignedAgentId) for backward compatibility
+      if (it.assignedAgentId) {
+        return it.assignedAgentId === user.id;
+      }
+      // If no assignment, agent cannot see it
+      return false;
+    });
   }, [user, itineraries]);
 
   useEffect(() => {
@@ -92,15 +105,15 @@ const AgentDashboard: React.FC = () => {
   };
 
   return (
-    <div className="space-y-8">
-      <div className="flex justify-between items-center">
-        <h1 className="text-3xl font-bold text-gray-800">Agent Dashboard</h1>
-        <Button onClick={() => setShowRegister(true)}>Register Customer</Button>
+    <div className="space-y-4 sm:space-y-6 lg:space-y-8">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 sm:gap-0">
+        <h1 className="text-2xl sm:text-3xl font-bold text-gray-800">Agent Dashboard</h1>
+        <Button onClick={() => setShowRegister(true)} className="w-full sm:w-auto">Register Customer</Button>
       </div>
 
       <div>
-        <div className="md:flex justify-between items-center mb-4">
-            <h2 className="text-2xl font-semibold text-gray-800 mb-4 md:mb-0">My Itineraries &amp; Bookings</h2>
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 sm:gap-0 mb-4">
+            <h2 className="text-xl sm:text-2xl font-semibold text-gray-800">My Itineraries &amp; Bookings</h2>
             <div className="flex flex-wrap gap-2 rounded-lg bg-gray-200 p-1">
                 {filterButtons.map(({ label, value }) => (
                     <button
@@ -129,7 +142,7 @@ const AgentDashboard: React.FC = () => {
         </div>
         
         {filteredItineraries.length > 0 ? (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
             {filteredItineraries.map(it => (
                 <Link to={`/itinerary/${it.id}`} key={it.id} className="group block h-full">
                 <Card className="overflow-hidden h-full transition-all duration-300 group-hover:shadow-2xl group-hover:-translate-y-1 flex flex-col">

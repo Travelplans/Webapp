@@ -32,3 +32,7 @@ export const QueryProvider = ({ children }: QueryProviderProps) => {
   );
 };
 
+
+
+
+

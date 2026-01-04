@@ -1,23 +1,12 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { GoogleGenAI, Type } from "@google/genai";
 import DashboardLayout from '../components/shared/DashboardLayout';
 import Card from '../components/shared/Card';
 import Button from '../components/shared/Button';
 import { SparklesIcon, RefreshIcon } from '../components/shared/icons/Icons';
 import { useData } from '../hooks/useData';
 import { useToast } from '../hooks/useToast';
-
-interface GeneratedPlan {
-  title: string;
-  price: number;
-  description: string;
-  dailyPlan: {
-    day: number;
-    title: string;
-    activities: string;
-  }[];
-}
+import { generateItinerary, generateImage, GeneratedItinerary } from '../src/services/api/aiService';
 
 const GenerateItineraryPage: React.FC = () => {
     const navigate = useNavigate();
@@ -31,7 +20,7 @@ const GenerateItineraryPage: React.FC = () => {
     
     const [isLoading, setIsLoading] = useState(false);
     const [isRegeneratingImage, setIsRegeneratingImage] = useState(false);
-    const [generatedPlan, setGeneratedPlan] = useState<GeneratedPlan | null>(null);
+    const [generatedPlan, setGeneratedPlan] = useState<GeneratedItinerary | null>(null);
     const [generatedImage, setGeneratedImage] = useState<string | null>(null);
     const [error, setError] = useState<string | null>(null);
     
@@ -43,41 +32,14 @@ const GenerateItineraryPage: React.FC = () => {
         setError(null);
 
         try {
-            const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-            
             // 1. Generate Itinerary Text
-            const prompt = `Create a detailed travel itinerary for a ${duration}-day trip to ${destination} for a ${travelerType} on a ${budget} budget. Provide a catchy title, an estimated price for one person in AED, a compelling one-paragraph summary of the trip, and a day-by-day plan. Each day should have a title and a paragraph describing the activities.`;
-
-            const responseSchema = {
-                type: Type.OBJECT,
-                properties: {
-                    title: { type: Type.STRING },
-                    price: { type: Type.INTEGER, description: "Estimated price for one person in AED, based on the budget." },
-                    description: { type: Type.STRING, description: "A compelling one-paragraph summary of the trip." },
-                    dailyPlan: {
-                        type: Type.ARRAY,
-                        items: {
-                            type: Type.OBJECT,
-                            properties: {
-                                day: { type: Type.INTEGER },
-                                title: { type: Type.STRING },
-                                activities: { type: Type.STRING },
-                            },
-                        },
-                    },
-                },
-            };
-            
-            const response = await ai.models.generateContent({
-                model: "gemini-2.5-flash",
-                contents: prompt,
-                config: {
-                    responseMimeType: "application/json",
-                    responseSchema,
-                },
+            const plan = await generateItinerary({
+                destination,
+                duration,
+                travelerType,
+                budget,
             });
 
-            const plan: GeneratedPlan = JSON.parse(response.text);
             setGeneratedPlan(plan);
             
             // 2. Generate Image
@@ -85,7 +47,7 @@ const GenerateItineraryPage: React.FC = () => {
 
         } catch (err) {
             console.error("AI generation failed:", err);
-            setError("Failed to generate itinerary. Please try again.");
+            setError(err instanceof Error ? err.message : "Failed to generate itinerary. Please try again.");
         } finally {
             setIsLoading(false);
         }
@@ -97,44 +59,37 @@ const GenerateItineraryPage: React.FC = () => {
         setError(null);
 
         try {
-            const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-            const imageResponse = await ai.models.generateImages({
-                model: 'imagen-4.0-generate-001',
-                prompt: `A scenic, high-quality, vibrant photograph representing a travel destination: ${destination}. No text or people.`,
-                config: {
-                    numberOfImages: 1,
-                    outputMimeType: 'image/jpeg',
-                    aspectRatio: '16:9',
-                },
+            const imageResponse = await generateImage({
+                destination,
             });
 
-            if (imageResponse.generatedImages?.length > 0) {
-                const base64ImageBytes: string = imageResponse.generatedImages[0].image.imageBytes;
-                setGeneratedImage(`data:image/jpeg;base64,${base64ImageBytes}`);
-            } else {
-                throw new Error("AI failed to return an image.");
-            }
+            setGeneratedImage(imageResponse.imageUrl);
         } catch (err) {
             console.error("Image regeneration failed:", err);
-            setError("Failed to regenerate the image. Please try again.");
+            setError(err instanceof Error ? err.message : "Failed to regenerate the image. Please try again.");
         } finally {
             if (!isInitialGeneration) setIsRegeneratingImage(false);
         }
     };
 
-    const handleSave = () => {
+    const handleSave = async () => {
         if (!generatedPlan || !generatedImage) return;
-        addItinerary({
-            title: generatedPlan.title,
-            destination: destination,
-            duration: Number(duration),
-            price: generatedPlan.price,
-            description: generatedPlan.description,
-            imageUrl: generatedImage,
-            collaterals: [],
-        });
-        addToast("Itinerary saved successfully!", "success");
-        navigate("/itineraries");
+        try {
+            await addItinerary({
+                title: generatedPlan.title,
+                destination: destination,
+                duration: Number(duration),
+                price: generatedPlan.price,
+                description: generatedPlan.description,
+                imageUrl: generatedImage,
+                collaterals: [],
+            });
+            addToast("Itinerary saved successfully!", "success");
+            navigate("/itineraries");
+        } catch (error) {
+            console.error('Error saving itinerary:', error);
+            addToast("Failed to save itinerary. Please try again.", "error");
+        }
     };
 
     return (

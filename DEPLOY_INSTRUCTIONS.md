@@ -140,3 +140,7 @@ The frontend is built and ready. Just run the login command and follow the promp
 npx firebase-tools login
 ```
 
+
+
+
+
