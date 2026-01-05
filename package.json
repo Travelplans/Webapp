@@ -8,8 +8,9 @@
     "dev:emulators": "concurrently \"npm run emulators\" \"npm run dev\"",
     "emulators": "firebase emulators:start",
     "emulators:exec": "firebase emulators:exec",
-    "start": "vite preview",
+    "start": "node server.js",
     "build": "vite build",
+    "gcp-build": "npm run build",
     "test": "jest",
     "test:watch": "jest --watch",
     "test:coverage": "jest --coverage",
@@ -27,6 +28,7 @@
   "dependencies": {
     "@tailwindcss/postcss": "^4.1.17",
     "@tanstack/react-query": "^5.90.11",
+    "express": "^4.21.2",
     "firebase": "^12.6.0",
     "react": "^19.1.1",
     "react-dom": "^19.1.1",
