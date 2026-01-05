@@ -62,6 +62,42 @@ const getFirebaseErrorMessage = (error: any): ErrorDetails => {
       userMessage: 'Please enter a valid email address.',
       statusCode: 400,
     },
+    'auth/invalid-login-credentials': {
+      code: 'INVALID_LOGIN_CREDENTIALS',
+      message: 'Invalid login credentials',
+      userMessage: 'Incorrect email or password. Please try again.',
+      statusCode: 401,
+    },
+    'auth/invalid-credential': {
+      code: 'INVALID_CREDENTIAL',
+      message: 'Invalid credential',
+      userMessage: 'Incorrect email or password. Please try again.',
+      statusCode: 401,
+    },
+    'auth/too-many-requests': {
+      code: 'TOO_MANY_REQUESTS',
+      message: 'Too many requests',
+      userMessage: 'Too many attempts. Please try again later.',
+      statusCode: 429,
+    },
+    'auth/operation-not-allowed': {
+      code: 'OPERATION_NOT_ALLOWED',
+      message: 'Operation not allowed',
+      userMessage: 'This sign-in method is disabled. Enable it in Firebase Console → Authentication.',
+      statusCode: 400,
+    },
+    'auth/unauthorized-domain': {
+      code: 'UNAUTHORIZED_DOMAIN',
+      message: 'Unauthorized domain',
+      userMessage: 'This domain is not authorized for Firebase Auth. Add it in Firebase Console → Authentication → Settings → Authorized domains.',
+      statusCode: 400,
+    },
+    'auth/network-request-failed': {
+      code: 'NETWORK_REQUEST_FAILED',
+      message: 'Network request failed',
+      userMessage: 'Network error. Please check your connection and try again.',
+      statusCode: 0,
+    },
     'permission-denied': {
       code: 'PERMISSION_DENIED',
       message: 'Permission denied',

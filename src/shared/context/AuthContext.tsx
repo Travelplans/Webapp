@@ -76,8 +76,11 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       await signInWithEmailAndPassword(auth, email, password);
     } catch (error) {
       const { logger } = await import('../utils/logger');
+      const { handleError } = await import('../utils/errorHandler');
+      const details = handleError(error, false);
       logger.error('Login error', error);
-      throw error;
+      // Surface a clean, user-friendly message to the UI
+      throw new Error(details.userMessage || 'Login failed. Please try again.');
     }
   };
 

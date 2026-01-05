@@ -20,10 +20,8 @@ const getEnvVar = (key: string, defaultValue?: string): string => {
   
   if (!value) {
     if (defaultValue) {
-      if (import.meta.env.PROD) {
-        // eslint-disable-next-line no-console
-        console.warn(`Using default value for ${key} in production. Set ${key} environment variable.`);
-      }
+      // If a default is provided, we intentionally allow it (even in PROD).
+      // This avoids noisy console warnings for non-secret frontend config like Firebase web config.
       return defaultValue;
     }
     
