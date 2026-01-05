@@ -21,12 +21,12 @@ import { getFirestore, collection, addDoc, getDocs, query, where, deleteDoc, doc
 import { getAuth, signInWithEmailAndPassword, connectAuthEmulator } from 'firebase/auth';
 
 const firebaseConfig = {
-  apiKey: "AIzaSyD0HAe0Q7ZNDIoAME0-iP-1Xwa_SzmgSvU",
-  authDomain: "travelplan-grav.firebaseapp.com",
-  projectId: "travelplan-grav",
-  storageBucket: "travelplan-grav.firebasestorage.app",
-  messagingSenderId: "848531208932",
-  appId: "1:848531208932:web:28bbab98766f81a553caf1"
+  apiKey: "AIzaSyAzA7MkNPrmBJ-V-4JrCFTmtlE_s76DKZg",
+  authDomain: "travelplans-web-b43c6.firebaseapp.com",
+  projectId: "travelplans-web-b43c6",
+  storageBucket: "travelplans-web-b43c6.firebasestorage.app",
+  messagingSenderId: "329181501952",
+  appId: "1:329181501952:web:85f39e8b525d40244116e5"
 };
 
 const app = initializeApp(firebaseConfig);

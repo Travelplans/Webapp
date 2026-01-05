@@ -50,31 +50,31 @@ export const env: EnvConfig = {
   firebase: {
     apiKey: getEnvVar(
       'VITE_FIREBASE_API_KEY',
-      import.meta.env.DEV ? 'AIzaSyD0HAe0Q7ZNDIoAME0-iP-1Xwa_SzmgSvU' : undefined
+      import.meta.env.DEV ? 'AIzaSyAzA7MkNPrmBJ-V-4JrCFTmtlE_s76DKZg' : undefined
     ),
     authDomain: getEnvVar(
       'VITE_FIREBASE_AUTH_DOMAIN',
-      import.meta.env.DEV ? 'travelplan-grav.firebaseapp.com' : undefined
+      import.meta.env.DEV ? 'travelplans-web-b43c6.firebaseapp.com' : undefined
     ),
     projectId: getEnvVar(
       'VITE_FIREBASE_PROJECT_ID',
-      import.meta.env.DEV ? 'travelplan-grav' : undefined
+      import.meta.env.DEV ? 'travelplans-web-b43c6' : undefined
     ),
     storageBucket: getEnvVar(
       'VITE_FIREBASE_STORAGE_BUCKET',
-      import.meta.env.DEV ? 'travelplan-grav.firebasestorage.app' : undefined
+      import.meta.env.DEV ? 'travelplans-web-b43c6.firebasestorage.app' : undefined
     ),
     messagingSenderId: getEnvVar(
       'VITE_FIREBASE_MESSAGING_SENDER_ID',
-      import.meta.env.DEV ? '848531208932' : undefined
+      import.meta.env.DEV ? '329181501952' : undefined
     ),
     appId: getEnvVar(
       'VITE_FIREBASE_APP_ID',
-      import.meta.env.DEV ? '1:848531208932:web:28bbab98766f81a553caf1' : undefined
+      import.meta.env.DEV ? '1:329181501952:web:85f39e8b525d40244116e5' : undefined
     ),
     measurementId: getEnvVar(
       'VITE_FIREBASE_MEASUREMENT_ID',
-      import.meta.env.DEV ? 'G-67MT6WJXQW' : undefined
+      import.meta.env.DEV ? 'G-GVR2ZDNFYW' : undefined
     ),
   },
 };

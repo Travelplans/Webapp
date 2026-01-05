@@ -4,8 +4,8 @@ import { auth } from '../../config/firebase';
 const isEmulator = import.meta.env.DEV && !import.meta.env.VITE_FUNCTIONS_URL;
 const API_BASE_URL = import.meta.env.VITE_FUNCTIONS_URL || 
   (isEmulator 
-    ? 'http://localhost:5001/travelplan-grav/us-central1/api'
-    : 'https://us-central1-travelplan-grav.cloudfunctions.net/api');
+    ? 'http://localhost:5001/travelplans-web-b43c6/us-central1/api'
+    : 'https://us-central1-travelplans-web-b43c6.cloudfunctions.net/api');
 
 /**
  * Get authentication token for API requests

@@ -6,13 +6,13 @@ import { getAuth, connectAuthEmulator } from 'firebase/auth';
 
 // Firebase configuration - defaults to production, can be overridden by environment variables
 const firebaseConfig = {
-    apiKey: import.meta.env.VITE_FIREBASE_API_KEY || "AIzaSyD0HAe0Q7ZNDIoAME0-iP-1Xwa_SzmgSvU",
-    authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN || "travelplan-grav.firebaseapp.com",
-    projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID || "travelplan-grav",
-    storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET || "travelplan-grav.firebasestorage.app",
-    messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID || "848531208932",
-    appId: import.meta.env.VITE_FIREBASE_APP_ID || "1:848531208932:web:28bbab98766f81a553caf1",
-    measurementId: import.meta.env.VITE_FIREBASE_MEASUREMENT_ID || "G-67MT6WJXQW",
+    apiKey: import.meta.env.VITE_FIREBASE_API_KEY || "AIzaSyAzA7MkNPrmBJ-V-4JrCFTmtlE_s76DKZg",
+    authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN || "travelplans-web-b43c6.firebaseapp.com",
+    projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID || "travelplans-web-b43c6",
+    storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET || "travelplans-web-b43c6.firebasestorage.app",
+    messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID || "329181501952",
+    appId: import.meta.env.VITE_FIREBASE_APP_ID || "1:329181501952:web:85f39e8b525d40244116e5",
+    measurementId: import.meta.env.VITE_FIREBASE_MEASUREMENT_ID || "G-GVR2ZDNFYW",
 };
 
 // Initialize Firebase
