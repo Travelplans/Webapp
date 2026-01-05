@@ -39,7 +39,7 @@ interface DataProviderProps {
 }
 
 export const DataProvider: React.FC<DataProviderProps> = ({ children }) => {
-  const { isAuthenticated, loading: authLoading, user } = useAuth();
+  const { isAuthenticated, loading: authLoading } = useAuth();
   const [users, setUsers] = useState<User[]>([]);
   const [itineraries, setItineraries] = useState<Itinerary[]>([]);
   const [customers, setCustomers] = useState<Customer[]>([]);
@@ -100,20 +100,7 @@ export const DataProvider: React.FC<DataProviderProps> = ({ children }) => {
     });
     subscriptionsRef.current.push(unsubscribeUsers);
 
-    const unsubscribeItineraries = (user?.roles?.includes('Agent') && !user?.roles?.includes('Admin') && user?.id)
-      ? firestoreService.subscribeToItinerariesForAgent(user.id, (updatedItineraries) => {
-        console.log('[DataContext] Itineraries (agent) subscription callback received:', {
-          count: updatedItineraries.length,
-          ids: updatedItineraries.map(it => it.id),
-          titles: updatedItineraries.map(it => it.title),
-        });
-        setItineraries([...updatedItineraries]);
-        if (!hasFired.itineraries) {
-          hasFired.itineraries = true;
-          checkLoadingComplete();
-        }
-      })
-      : firestoreService.subscribeToItineraries((updatedItineraries) => {
+    const unsubscribeItineraries = firestoreService.subscribeToItineraries((updatedItineraries) => {
       console.log('[DataContext] Itineraries subscription callback received:', {
         count: updatedItineraries.length,
         ids: updatedItineraries.map(it => it.id),
@@ -176,7 +163,7 @@ export const DataProvider: React.FC<DataProviderProps> = ({ children }) => {
       subscriptionsRef.current = [];
       clearTimeout(fallbackTimer);
     };
-  }, [isAuthenticated, authLoading, user?.id, user?.roles]);
+  }, [isAuthenticated, authLoading]);
 
   // Manual refresh function to force data reload
   // Note: Subscriptions should handle updates automatically, but this can be used as a fallback

@@ -14,7 +14,6 @@ import {
     DocumentData,
     QuerySnapshot,
     Unsubscribe,
-    deleteField,
 } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL, deleteObject } from 'firebase/storage';
 import { db, storage } from '../../config/firebase';
@@ -139,29 +138,7 @@ export const addUser = async (user: Omit<User, 'id'> & { password?: string }): P
 
 export const updateUser = async (userId: string, updates: Partial<User>): Promise<void> => {
     const userRef = doc(db, COLLECTIONS.USERS, userId);
-    
-    // Remove undefined values - Firebase doesn't allow undefined
-    const cleanedUpdates: any = {};
-    Object.keys(updates).forEach(key => {
-        const value = (updates as any)[key];
-        if (value !== undefined && value !== null) {
-            cleanedUpdates[key] = value;
-        }
-    });
-    
-    // If useSameAsContact is true, explicitly delete WhatsApp-specific fields
-    if (cleanedUpdates.useSameAsContact === true) {
-        cleanedUpdates.whatsappCountryCode = deleteField();
-        cleanedUpdates.whatsappNumber = deleteField();
-    }
-    
-    if (Object.keys(cleanedUpdates).length === 0) {
-        console.warn('[updateUser] No valid updates to apply');
-        return;
-    }
-    
-    console.log('[updateUser] Updating user with cleaned data:', cleanedUpdates);
-    await updateDoc(userRef, cleanedUpdates);
+    await updateDoc(userRef, updates);
 };
 
 export const deleteUser = async (userId: string, userEmail?: string): Promise<void> => {
@@ -323,94 +300,6 @@ export const subscribeToItineraries = (callback: (itineraries: Itinerary[]) => v
             }
         }
     );
-};
-
-/**
- * Subscribe to itineraries for an Agent (assigned itineraries only).
- * This avoids permission-denied errors from querying the whole collection.
- */
-export const subscribeToItinerariesForAgent = (
-    agentId: string,
-    callback: (itineraries: Itinerary[]) => void
-): Unsubscribe => {
-    const itinerariesRef = collection(db, COLLECTIONS.ITINERARIES);
-    console.log('[subscribeToItinerariesForAgent] Setting up agent-only subscriptions:', { agentId });
-
-    const byNewFormat = query(itinerariesRef, where('assignedAgentIds', 'array-contains', agentId));
-    const byOldFormat = query(itinerariesRef, where('assignedAgentId', '==', agentId));
-
-    let latestNew: Itinerary[] = [];
-    let latestOld: Itinerary[] = [];
-
-    const normalize = (snapshot: QuerySnapshot<DocumentData>): Itinerary[] => {
-        return snapshot.docs.map(docSnap => {
-            const data = docSnap.data();
-            const itinerary: Itinerary = {
-                id: docSnap.id,
-                title: data.title || 'Untitled Itinerary',
-                destination: data.destination || 'Unknown',
-                duration: typeof data.duration === 'number' ? data.duration : (parseInt(data.duration) || 0),
-                price: typeof data.price === 'number' ? data.price : (parseFloat(data.price) || 0),
-                description: data.description || '',
-                imageUrl: data.imageUrl || 'https://images.unsplash.com/photo-1501785888041-af3ef285b470?q=80&w=2070',
-                collaterals: Array.isArray(data.collaterals) ? data.collaterals : [],
-            };
-
-            if (data.dailyPlan && Array.isArray(data.dailyPlan)) {
-                itinerary.dailyPlan = data.dailyPlan;
-            }
-
-            // Normalize assignment fields
-            if (data.assignedAgentIds && Array.isArray(data.assignedAgentIds)) {
-                itinerary.assignedAgentIds = data.assignedAgentIds;
-            } else if (data.assignedAgentId) {
-                itinerary.assignedAgentIds = [data.assignedAgentId];
-                itinerary.assignedAgentId = data.assignedAgentId;
-            }
-
-            return itinerary;
-        });
-    };
-
-    const emitMerged = () => {
-        const merged = new Map<string, Itinerary>();
-        for (const it of latestNew) merged.set(it.id, it);
-        for (const it of latestOld) merged.set(it.id, it);
-        callback(Array.from(merged.values()));
-    };
-
-    const unsub1 = onSnapshot(
-        byNewFormat,
-        { includeMetadataChanges: true },
-        (snapshot) => {
-            latestNew = normalize(snapshot);
-            emitMerged();
-        },
-        (error) => {
-            console.error('[subscribeToItinerariesForAgent] New-format subscription error:', error);
-            latestNew = [];
-            emitMerged();
-        }
-    );
-
-    const unsub2 = onSnapshot(
-        byOldFormat,
-        { includeMetadataChanges: true },
-        (snapshot) => {
-            latestOld = normalize(snapshot);
-            emitMerged();
-        },
-        (error) => {
-            console.error('[subscribeToItinerariesForAgent] Old-format subscription error:', error);
-            latestOld = [];
-            emitMerged();
-        }
-    );
-
-    return () => {
-        unsub1();
-        unsub2();
-    };
 };
 
 export const addItinerary = async (itinerary: Omit<Itinerary, 'id'>): Promise<string> => {

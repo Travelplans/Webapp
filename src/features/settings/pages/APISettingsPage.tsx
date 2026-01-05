@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import DashboardLayout from '../../../shared/components/DashboardLayout';
 import Card from '../../../shared/components/Card';
 import Button from '../../../shared/components/Button';
@@ -6,7 +6,6 @@ import { useAuth } from '../../../shared/hooks/useAuth';
 import { useToast } from '../../../shared/hooks/useToast';
 import { UserRole } from '../../../shared/types';
 import { EyeIcon } from '../../../shared/components/icons/Icons';
-import { updateApiCredentials, getApiCredentialsStatus } from '../../../services/api/aiService';
 
 const APISettingsPage: React.FC = () => {
   const { user: currentUser } = useAuth();
@@ -39,29 +38,6 @@ const APISettingsPage: React.FC = () => {
   });
 
   const [isSaving, setIsSaving] = useState<string | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
-  const [status, setStatus] = useState<Awaited<ReturnType<typeof getApiCredentialsStatus>> | null>(null);
-
-  // Load credentials status on mount
-  useEffect(() => {
-    const loadStatus = async () => {
-      if (!currentUser || !currentUser.roles.includes(UserRole.ADMIN)) {
-        setIsLoading(false);
-        return;
-      }
-      
-      try {
-        const nextStatus = await getApiCredentialsStatus();
-        setStatus(nextStatus);
-      } catch (error) {
-        console.error('Error loading credentials status:', error);
-      } finally {
-        setIsLoading(false);
-      }
-    };
-    
-    loadStatus();
-  }, [currentUser]);
 
   // Check if current user is admin
   if (!currentUser || !currentUser.roles.includes(UserRole.ADMIN)) {
@@ -182,41 +158,15 @@ const APISettingsPage: React.FC = () => {
   };
 
   const handleSave = async (section: string, field?: string) => {
-    const savingKey = `${section}-${field || 'main'}`;
-    setIsSaving(savingKey);
+    setIsSaving(`${section}-${field || 'main'}`);
 
     try {
-      // Get the value to save
-      let valueToSave = '';
+      // TODO: Implement actual API call to update credentials
+      // This is a placeholder - actual implementation would call Firebase Functions
+      // to update the secrets via Firebase Admin SDK or a secure endpoint
       
-      if (section === 'googleAI') {
-        valueToSave = credentials.googleAI.newValue;
-      } else if (section === 'twilio' && field) {
-        valueToSave = credentials.twilio.newValue[field as keyof typeof credentials.twilio.newValue];
-      } else if (section === 'email') {
-        if (field === 'apiKey') {
-          valueToSave = credentials.email.newValue.apiKey;
-        } else if (field === 'fromEmail') {
-          valueToSave = credentials.email.newValue.fromEmail;
-        } else if (field === 'service') {
-          valueToSave = credentials.email.service;
-        }
-      }
+      await new Promise(resolve => setTimeout(resolve, 1000)); // Simulate API call
 
-      if (!valueToSave || !valueToSave.trim()) {
-        addToast('Please enter a value before saving', 'error');
-        setIsSaving(null);
-        return;
-      }
-
-      // Call the API to update credentials
-      await updateApiCredentials({
-        section: section as 'googleAI' | 'twilio' | 'email',
-        field: field,
-        value: valueToSave.trim(),
-      });
-
-      // Update local state to reflect saved values
       if (section === 'googleAI') {
         setCredentials(prev => ({
           ...prev,
@@ -246,43 +196,23 @@ const APISettingsPage: React.FC = () => {
         }));
         addToast(`Twilio ${field} updated successfully`, 'success');
       } else if (section === 'email') {
-        if (field === 'apiKey') {
-          setCredentials(prev => ({
-            ...prev,
-            email: {
-              ...prev.email,
-              apiKey: '••••••••••••••••••••••••••••••••',
-              isEditing: false,
-              newValue: { ...prev.email.newValue, apiKey: '' },
-            },
-          }));
-          addToast('Email service API key updated successfully', 'success');
-        } else if (field === 'fromEmail') {
-          setCredentials(prev => ({
-            ...prev,
-            email: {
-              ...prev.email,
-              fromEmail: valueToSave,
-              isEditing: false,
-              newValue: { ...prev.email.newValue, fromEmail: '' },
-            },
-          }));
-          addToast('From email address updated successfully', 'success');
-        } else if (field === 'service') {
-          setCredentials(prev => ({
-            ...prev,
-            email: {
-              ...prev.email,
-              service: valueToSave as 'sendgrid' | 'mailgun' | 'aws-ses' | 'none',
-            },
-          }));
-          addToast('Email service provider updated successfully', 'success');
-        }
+        setCredentials(prev => ({
+          ...prev,
+          email: {
+            ...prev.email,
+            apiKey: '••••••••••••••••••••••••••••••••',
+            isEditing: false,
+            newValue: { apiKey: '', fromEmail: '' },
+          },
+        }));
+        addToast('Email service credentials updated successfully', 'success');
       }
     } catch (error) {
       console.error('Error updating credentials:', error);
-      const errorMessage = error instanceof Error ? error.message : 'Failed to update credentials';
-      addToast(errorMessage, 'error');
+      addToast(
+        error instanceof Error ? error.message : 'Failed to update credentials',
+        'error'
+      );
     } finally {
       setIsSaving(null);
     }
@@ -411,11 +341,6 @@ const APISettingsPage: React.FC = () => {
         <div>
           <h1 className="text-2xl sm:text-3xl font-bold text-gray-800">API Settings</h1>
           <p className="text-xs sm:text-sm text-gray-600 mt-1">Manage third-party API credentials and configurations</p>
-          {status && (
-            <p className="text-xs text-gray-500 mt-2">
-              Status sources: <span className="font-medium">Firestore</span> = saved from this page, <span className="font-medium">Secret</span> = deployed Firebase secret.
-            </p>
-          )}
         </div>
 
         {/* Google AI Settings */}
@@ -426,16 +351,9 @@ const APISettingsPage: React.FC = () => {
                 <h2 className="text-lg sm:text-xl font-semibold text-gray-800">Google AI (Gemini)</h2>
                 <p className="text-xs sm:text-sm text-gray-500 mt-1">Used for AI itinerary generation, image generation, and chatbot</p>
               </div>
-              <div className="flex flex-wrap items-center gap-2 self-start sm:self-auto">
-                <span className="px-3 py-1 text-xs font-medium rounded-full bg-blue-100 text-blue-800">
-                  Required
-                </span>
-                {status && (
-                  <span className={`px-3 py-1 text-xs font-medium rounded-full ${status.googleAI.configured ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
-                    {status.googleAI.configured ? `Configured (${status.googleAI.source})` : 'Not configured'}
-                  </span>
-                )}
-              </div>
+              <span className="px-3 py-1 text-xs font-medium rounded-full bg-blue-100 text-blue-800 self-start sm:self-auto">
+                Required
+              </span>
             </div>
 
             {renderCredentialField(
@@ -476,22 +394,9 @@ const APISettingsPage: React.FC = () => {
                 <h2 className="text-lg sm:text-xl font-semibold text-gray-800">Twilio (WhatsApp)</h2>
                 <p className="text-xs sm:text-sm text-gray-500 mt-1">Used for sending WhatsApp messages to users</p>
               </div>
-              <div className="flex flex-wrap items-center gap-2 self-start sm:self-auto">
-                <span className="px-3 py-1 text-xs font-medium rounded-full bg-green-100 text-green-800">
-                  Required
-                </span>
-                {status && (
-                  <span className={`px-3 py-1 text-xs font-medium rounded-full ${
-                    status.twilio.accountSid.configured && status.twilio.authToken.configured && status.twilio.whatsappFrom.configured
-                      ? 'bg-green-100 text-green-800'
-                      : 'bg-yellow-100 text-yellow-800'
-                  }`}>
-                    {status.twilio.accountSid.configured && status.twilio.authToken.configured && status.twilio.whatsappFrom.configured
-                      ? `Configured (${[status.twilio.accountSid.source, status.twilio.authToken.source, status.twilio.whatsappFrom.source].includes('firestore') ? 'firestore' : 'secret'})`
-                      : 'Partially configured'}
-                  </span>
-                )}
-              </div>
+              <span className="px-3 py-1 text-xs font-medium rounded-full bg-green-100 text-green-800 self-start sm:self-auto">
+                Required
+              </span>
             </div>
 
             {renderCredentialField(
@@ -579,28 +484,10 @@ const APISettingsPage: React.FC = () => {
               <label className="block text-sm font-medium text-gray-700">Email Service Provider</label>
               <select
                 value={credentials.email.service}
-                onChange={async (e) => {
-                  const newService = e.target.value;
-                  setCredentials(prev => ({
-                    ...prev,
-                    email: { ...prev.email, service: newService as 'sendgrid' | 'mailgun' | 'aws-ses' | 'none' },
-                  }));
-                  
-                  // Auto-save service selection
-                  if (newService !== 'none') {
-                    try {
-                      await updateApiCredentials({
-                        section: 'email',
-                        field: 'service',
-                        value: newService,
-                      });
-                      addToast('Email service provider updated successfully', 'success');
-                    } catch (error) {
-                      console.error('Error updating email service:', error);
-                      addToast('Failed to update email service provider', 'error');
-                    }
-                  }
-                }}
+                onChange={e => setCredentials(prev => ({
+                  ...prev,
+                  email: { ...prev.email, service: e.target.value },
+                }))}
                 className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-primary focus:border-primary sm:text-sm text-gray-900 bg-white"
               >
                 <option value="sendgrid">SendGrid</option>
@@ -621,7 +508,7 @@ const APISettingsPage: React.FC = () => {
                   () => handleToggleVisibility('email'),
                   () => handleStartEdit('email'),
                   () => handleCancelEdit('email'),
-                  () => handleSave('email', 'apiKey'),
+                  () => handleSave('email'),
                   'email-apiKey',
                   `Enter your ${credentials.email.service} API key`
                 )}
@@ -635,7 +522,7 @@ const APISettingsPage: React.FC = () => {
                   () => handleToggleVisibility('email'),
                   () => handleStartEdit('email'),
                   () => handleCancelEdit('email'),
-                  () => handleSave('email', 'fromEmail'),
+                  () => handleSave('email'),
                   'email-fromEmail',
                   'e.g., noreply@travelplans.fun',
                   'email'

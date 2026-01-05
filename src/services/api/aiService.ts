@@ -10,12 +10,12 @@ const API_BASE_URL = import.meta.env.VITE_FUNCTIONS_URL ||
 /**
  * Get authentication token for API requests
  */
-const getAuthToken = async (forceRefresh: boolean = false): Promise<string | null> => {
+const getAuthToken = async (): Promise<string | null> => {
   const user = auth.currentUser;
   if (!user) {
     return null;
   }
-  return await user.getIdToken(forceRefresh);
+  return await user.getIdToken();
 };
 
 /**
@@ -104,30 +104,9 @@ const apiRequest = async <T>(endpoint: string, options: RequestInit = {}): Promi
 
       return data.data;
     } catch (error) {
-      if (error instanceof TypeError && (error.message.includes('fetch') || error.message.includes('Failed to fetch'))) {
+      if (error instanceof TypeError && error.message.includes('fetch')) {
         console.error('[apiRequest] Network error - Cloud Function may not be deployed or accessible:', error);
-        console.error('[apiRequest] Attempted URL:', url);
-        console.error('[apiRequest] API_BASE_URL:', API_BASE_URL);
-        
-        // Provide concise but helpful error message
-        const shortMessage = `Cannot connect to Cloud Function. The function may not be deployed.`;
-        const detailedMessage = `Cannot connect to Cloud Function at ${url}.
-
-To fix this, deploy the Cloud Functions:
-1. Open terminal in the project root
-2. Run: npm run deploy:functions
-   OR
-   cd functions && npm install && npm run build && firebase deploy --only functions
-
-Check deployment status:
-- Firebase Console: https://console.firebase.google.com/project/travelplan-grav/functions
-- Ensure GOOGLE_AI_API_KEY secret is set: firebase functions:secrets:set GOOGLE_AI_API_KEY`;
-        
-        // Log detailed message to console for debugging
-        console.error('[apiRequest]', detailedMessage);
-        
-        // Throw concise message for UI display
-        throw new Error(shortMessage);
+        throw new Error(`Cannot connect to Cloud Function. Please ensure it is deployed. URL: ${url}`);
       }
       throw error;
     }
@@ -283,57 +262,6 @@ export const sendWhatsApp = async (params: SendWhatsAppParams): Promise<SendWhat
   return apiRequest<SendWhatsAppResponse>('/sendWhatsApp', {
     method: 'POST',
     body: JSON.stringify(params),
-  });
-};
-
-/**
- * Update API Credentials (Admin only)
- */
-export interface UpdateApiCredentialsParams {
-  section: 'googleAI' | 'twilio' | 'email';
-  field?: string;
-  value: string;
-}
-
-export interface UpdateApiCredentialsResponse {
-  section: string;
-  field: string;
-}
-
-export const updateApiCredentials = async (params: UpdateApiCredentialsParams): Promise<UpdateApiCredentialsResponse> => {
-  return apiRequest<UpdateApiCredentialsResponse>('/updateApiCredentials', {
-    method: 'POST',
-    body: JSON.stringify(params),
-  });
-};
-
-/**
- * Get API Credentials Status (Admin only)
- */
-export interface ApiCredentialsStatus {
-  googleAI: {
-    configured: boolean;
-    source: 'secret' | 'firestore' | 'none';
-  };
-  twilio: {
-    accountSid: {
-      configured: boolean;
-      source: 'secret' | 'firestore' | 'none';
-    };
-    authToken: {
-      configured: boolean;
-      source: 'secret' | 'firestore' | 'none';
-    };
-    whatsappFrom: {
-      configured: boolean;
-      source: 'secret' | 'firestore' | 'none';
-    };
-  };
-}
-
-export const getApiCredentialsStatus = async (): Promise<ApiCredentialsStatus> => {
-  return apiRequest<ApiCredentialsStatus>('/getApiCredentialsStatus', {
-    method: 'GET',
   });
 };
 

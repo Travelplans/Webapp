@@ -28,23 +28,11 @@ import { rateLimiter } from './middleware/rateLimiter';
 app.use(rateLimiter);
 
 // Initialize Google AI
-const getAI = async () => {
-  // Prefer Firestore (admin-updatable) values, fall back to deployed secret.
-  // This makes Admin "API Settings" updates take effect even when a secret is set.
-  let firestoreApiKey: string | undefined;
-  try {
-    const credentialsRef = admin.firestore().collection('apiCredentials').doc('secrets');
-    const credentialsDoc = await credentialsRef.get();
-    const credentialsData = credentialsDoc.data();
-    firestoreApiKey = credentialsData?.googleAI?.apiKey;
-  } catch (error) {
-    console.warn('Error reading API key from Firestore:', error);
-  }
-
-  const apiKey = (firestoreApiKey && firestoreApiKey.trim()) ? firestoreApiKey.trim() : googleAiApiKey.value();
-  
+const getAI = () => {
+  // Get API key from secret
+  const apiKey = googleAiApiKey.value();
   if (!apiKey) {
-    throw new Error("Google AI API key not configured. Set GOOGLE_AI_API_KEY secret via: firebase functions:secrets:set GOOGLE_AI_API_KEY or update via Admin Settings");
+    throw new Error("Google AI API key not configured. Set GOOGLE_AI_API_KEY secret via: firebase functions:secrets:set GOOGLE_AI_API_KEY");
   }
   return new GoogleGenAI({ apiKey });
 };
@@ -78,7 +66,7 @@ app.post("/generateItinerary", verifyAuth, async (req: express.Request, res: exp
       return;
     }
 
-    const ai = await getAI();
+    const ai = getAI();
     const prompt = `Create a detailed travel itinerary for a ${duration}-day trip to ${destination} for a ${travelerType} on a ${budget} budget. Provide a catchy title, an estimated price for one person in AED, a compelling one-paragraph summary of the trip, and a day-by-day plan. Each day should have a title and a paragraph describing the activities.`;
 
     const responseSchema = {
@@ -163,7 +151,7 @@ app.post("/generateImage", verifyAuth, async (req: express.Request, res: express
       return;
     }
 
-    const ai = await getAI();
+    const ai = getAI();
     const imagePrompt = prompt || `A scenic, high-quality, vibrant photograph representing a travel destination: ${destination}. No text or people.`;
 
     const imageResponse = await ai.models.generateImages({
@@ -223,7 +211,7 @@ app.post("/chat", verifyAuth, async (req: express.Request, res: express.Response
       return;
     }
 
-    const ai = await getAI();
+    const ai = getAI();
 
     const systemInstruction = itineraryContext
       ? `You are a friendly and helpful travel assistant for a company called "Travelplans.fun". Your goal is to help users find their perfect travel package. You have access to the following list of available itineraries. Use this information to answer user questions and make recommendations. Be concise and conversational. Do not mention that you have a list; just use the information naturally.\n\nAvailable Itineraries:\n${itineraryContext}`
@@ -512,31 +500,15 @@ app.post("/sendWhatsApp", verifyAuth, async (req: express.Request, res: express.
       return;
     }
 
-    // Prefer Firestore (admin-updatable) values, fall back to deployed secrets.
-    let firestoreTwilio: any = null;
-    try {
-      const credentialsRef = admin.firestore().collection('apiCredentials').doc('secrets');
-      const credentialsDoc = await credentialsRef.get();
-      const credentialsData = credentialsDoc.data();
-      firestoreTwilio = credentialsData?.twilio || null;
-    } catch (error) {
-      console.warn('Error reading Twilio credentials from Firestore:', error);
-    }
-
-    const accountSid = (firestoreTwilio?.accountSid && String(firestoreTwilio.accountSid).trim())
-      ? String(firestoreTwilio.accountSid).trim()
-      : twilioAccountSid.value();
-    const authToken = (firestoreTwilio?.authToken && String(firestoreTwilio.authToken).trim())
-      ? String(firestoreTwilio.authToken).trim()
-      : twilioAuthToken.value();
-    const fromNumber = (firestoreTwilio?.whatsappFrom && String(firestoreTwilio.whatsappFrom).trim())
-      ? String(firestoreTwilio.whatsappFrom).trim()
-      : twilioWhatsAppFrom.value();
+    // Get Twilio credentials
+    const accountSid = twilioAccountSid.value();
+    const authToken = twilioAuthToken.value();
+    const fromNumber = twilioWhatsAppFrom.value();
 
     if (!accountSid || !authToken || !fromNumber) {
       res.status(500).json({ 
         success: false,
-        error: "Twilio credentials not configured. Please set TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, and TWILIO_WHATSAPP_FROM secrets or update via Admin Settings." 
+        error: "Twilio credentials not configured. Please set TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, and TWILIO_WHATSAPP_FROM secrets." 
       });
       return;
     }
@@ -623,157 +595,6 @@ app.post("/sendWhatsApp", verifyAuth, async (req: express.Request, res: express.
     res.status(500).json({ 
       success: false,
       error: "Failed to send WhatsApp messages", 
-      details: error instanceof Error ? error.message : "Unknown error" 
-    });
-  }
-});
-
-// Update API Credentials (Admin only)
-app.post("/updateApiCredentials", verifyAuth, async (req: express.Request, res: express.Response) => {
-  try {
-    const { section, field, value } = req.body;
-    const { uid } = req.body; // From verifyAuth middleware
-
-    if (!section || !value || !value.trim()) {
-      res.status(400).json({ 
-        success: false,
-        error: "Missing required fields: section and value are required" 
-      });
-      return;
-    }
-
-    // Verify the requester is an admin
-    const requesterDoc = await admin.firestore().collection('users').doc(uid).get();
-    const requesterData = requesterDoc.data();
-    const requesterFirestoreRoles = requesterData?.roles || [];
-    const isAdmin = requesterFirestoreRoles.includes('Admin');
-
-    if (!isAdmin) {
-      res.status(403).json({ 
-        success: false,
-        error: "Forbidden: Only admins can update API credentials" 
-      });
-      return;
-    }
-
-    // Store credentials in Firestore (secure collection)
-    const credentialsRef = admin.firestore().collection('apiCredentials').doc('secrets');
-    const credentialsData: any = {};
-    
-    if (section === 'googleAI') {
-      credentialsData.googleAI = { apiKey: value.trim() };
-    } else if (section === 'twilio' && field) {
-      const currentData = (await credentialsRef.get()).data() || {};
-      credentialsData.twilio = {
-        ...(currentData.twilio || {}),
-        [field]: value.trim()
-      };
-    } else if (section === 'email') {
-      const currentData = (await credentialsRef.get()).data() || {};
-      if (field === 'apiKey') {
-        credentialsData.email = {
-          ...(currentData.email || {}),
-          apiKey: value.trim()
-        };
-      } else if (field === 'fromEmail') {
-        credentialsData.email = {
-          ...(currentData.email || {}),
-          fromEmail: value.trim()
-        };
-      } else if (field === 'service') {
-        credentialsData.email = {
-          ...(currentData.email || {}),
-          service: value.trim()
-        };
-      }
-    }
-
-    // Update Firestore document
-    await credentialsRef.set(credentialsData, { merge: true });
-
-    // Note: To actually update Firebase Functions secrets, you would need to:
-    // 1. Use Firebase Admin SDK to update secrets (requires special permissions)
-    // 2. Or use Firebase CLI: firebase functions:secrets:set SECRET_NAME
-    // For now, we store in Firestore and functions can read from there as fallback
-
-    res.json({ 
-      success: true,
-      message: "API credentials updated successfully",
-      data: { section, field: field || 'main' }
-    });
-  } catch (error) {
-    console.error("Update API credentials error:", error);
-    res.status(500).json({ 
-      success: false,
-      error: "Failed to update API credentials", 
-      details: error instanceof Error ? error.message : "Unknown error" 
-    });
-  }
-});
-
-// Get API Credentials Status (Admin only) - Returns masked values
-app.get("/getApiCredentialsStatus", verifyAuth, async (req: express.Request, res: express.Response) => {
-  try {
-    const authHeader = req.headers.authorization;
-    if (!authHeader || !authHeader.startsWith("Bearer ")) {
-      res.status(401).json({ error: "Unauthorized: No token provided" });
-      return;
-    }
-
-    const idToken = authHeader.split("Bearer ")[1];
-    const decodedToken = await admin.auth().verifyIdToken(idToken);
-    const uid = decodedToken.uid;
-
-    // Verify the requester is an admin
-    const requesterDoc = await admin.firestore().collection('users').doc(uid).get();
-    const requesterData = requesterDoc.data();
-    const requesterFirestoreRoles = requesterData?.roles || [];
-    const isAdmin = requesterFirestoreRoles.includes('Admin');
-
-    if (!isAdmin) {
-      res.status(403).json({ 
-        success: false,
-        error: "Forbidden: Only admins can view API credentials status" 
-      });
-      return;
-    }
-
-    // Check if credentials exist in Firestore
-    const credentialsRef = admin.firestore().collection('apiCredentials').doc('secrets');
-    const credentialsDoc = await credentialsRef.get();
-    const credentialsData = credentialsDoc.data() || {};
-
-    // Prefer Firestore when present (admin-updatable override), else secret.
-    const secretsStatus = {
-      googleAI: {
-        configured: !!credentialsData.googleAI?.apiKey || !!googleAiApiKey.value(),
-        source: credentialsData.googleAI?.apiKey ? 'firestore' : (googleAiApiKey.value() ? 'secret' : 'none')
-      },
-      twilio: {
-        accountSid: {
-          configured: !!credentialsData.twilio?.accountSid || !!twilioAccountSid.value(),
-          source: credentialsData.twilio?.accountSid ? 'firestore' : (twilioAccountSid.value() ? 'secret' : 'none')
-        },
-        authToken: {
-          configured: !!credentialsData.twilio?.authToken || !!twilioAuthToken.value(),
-          source: credentialsData.twilio?.authToken ? 'firestore' : (twilioAuthToken.value() ? 'secret' : 'none')
-        },
-        whatsappFrom: {
-          configured: !!credentialsData.twilio?.whatsappFrom || !!twilioWhatsAppFrom.value(),
-          source: credentialsData.twilio?.whatsappFrom ? 'firestore' : (twilioWhatsAppFrom.value() ? 'secret' : 'none')
-        }
-      }
-    };
-
-    res.json({ 
-      success: true,
-      data: secretsStatus
-    });
-  } catch (error) {
-    console.error("Get API credentials status error:", error);
-    res.status(500).json({ 
-      success: false,
-      error: "Failed to get API credentials status", 
       details: error instanceof Error ? error.message : "Unknown error" 
     });
   }

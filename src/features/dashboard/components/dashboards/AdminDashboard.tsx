@@ -39,24 +39,6 @@ const AdminDashboard: React.FC = () => {
         </Card>
       </div>
 
-      {/* Quick Actions */}
-      <Card>
-        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 sm:gap-0">
-          <div>
-            <h2 className="text-lg sm:text-xl font-semibold text-gray-800">Quick Actions</h2>
-            <p className="text-xs sm:text-sm text-gray-500 mt-1">Common admin tools</p>
-          </div>
-          <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
-            <Link to="/settings" className="w-full sm:w-auto">
-              <Button className="w-full sm:w-auto">API Settings</Button>
-            </Link>
-            <Link to="/users" className="w-full sm:w-auto">
-              <Button variant="secondary" className="w-full sm:w-auto">Manage Users</Button>
-            </Link>
-          </div>
-        </div>
-      </Card>
-
       {/* Itinerary Management */}
       <Card>
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 sm:gap-0 mb-4">

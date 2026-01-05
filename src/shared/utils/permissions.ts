@@ -45,8 +45,7 @@ export const DEFAULT_SYSTEM_ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
 // Cache for system roles loaded from Firestore
 let systemRolesCache: Map<UserRole, Permission[]> | null = null;
 let systemRolesCacheTimestamp: number = 0;
-// Keep this short so permission changes in Firestore reflect quickly in the UI.
-const CACHE_DURATION = 10 * 1000; // 10 seconds
+const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
 
 /**
  * Get system role permissions from Firestore or fallback to defaults

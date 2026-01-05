@@ -10,7 +10,7 @@ import { useData } from '../../../shared/hooks/useData';
 import { useToast } from '../../../shared/hooks/useToast';
 import { useAuth } from '../../../shared/hooks/useAuth';
 import { Itinerary, UserRole, Permission } from '../../../shared/types';
-import { hasPermission } from '../../../shared/utils/permissions';
+import { hasPermissionSync as hasPermission } from '../../../shared/utils/permissions';
 import { EditIcon, DeleteIcon } from '../../../shared/components/icons/Icons';
 
 const ItinerariesPage: React.FC = () => {
@@ -39,23 +39,7 @@ const ItinerariesPage: React.FC = () => {
   
   const isAdmin = user?.roles.includes(UserRole.ADMIN);
   const isAgent = user?.roles.includes(UserRole.AGENT);
-  const [canCreateItinerary, setCanCreateItinerary] = useState<boolean>(!!isAdmin);
-
-  React.useEffect(() => {
-    let cancelled = false;
-    const compute = async () => {
-      if (isAdmin) {
-        if (!cancelled) setCanCreateItinerary(true);
-        return;
-      }
-      const allowed = await hasPermission(user ?? null, Permission.CREATE_ITINERARY);
-      if (!cancelled) setCanCreateItinerary(allowed);
-    };
-    compute();
-    return () => {
-      cancelled = true;
-    };
-  }, [isAdmin, user?.id, user?.roles]);
+  const canCreateItinerary = isAdmin || hasPermission(user, Permission.CREATE_ITINERARY);
 
   const filteredItineraries = useMemo(() => {
     console.log('[ItinerariesPage] Filtering itineraries:', {
@@ -69,42 +53,19 @@ const ItinerariesPage: React.FC = () => {
     
     // Filter by role: Agents only see their assigned itineraries
     let roleFiltered = itineraries;
-    if (isAgent && !isAdmin && user?.id) {
+    if (isAgent && !isAdmin) {
       roleFiltered = itineraries.filter(it => {
-        // Check new format (assignedAgentIds array) - primary check
-        if (it.assignedAgentIds && Array.isArray(it.assignedAgentIds) && it.assignedAgentIds.length > 0) {
-          const isAssigned = it.assignedAgentIds.includes(user.id);
-          if (isAssigned) {
-            console.log('[ItinerariesPage] Itinerary assigned via assignedAgentIds:', {
-              itineraryId: it.id,
-              title: it.title,
-              assignedAgentIds: it.assignedAgentIds,
-              userId: user.id
-            });
-          }
-          return isAssigned;
+        // Check new format (assignedAgentIds array)
+        if (it.assignedAgentIds && Array.isArray(it.assignedAgentIds)) {
+          return it.assignedAgentIds.includes(user?.id || '');
         }
         // Check old format (assignedAgentId) for backward compatibility
-        if (it.assignedAgentId) {
-          const isAssigned = it.assignedAgentId === user.id;
-          if (isAssigned) {
-            console.log('[ItinerariesPage] Itinerary assigned via assignedAgentId:', {
-              itineraryId: it.id,
-              title: it.title,
-              assignedAgentId: it.assignedAgentId,
-              userId: user.id
-            });
-          }
-          return isAssigned;
-        }
-        // If no assignment, agent cannot see it
-        return false;
+        return it.assignedAgentId === user?.id;
       });
       console.log('[ItinerariesPage] Agent filtered itineraries:', {
-        userId: user.id,
         total: itineraries.length,
         assigned: roleFiltered.length,
-        assignedIds: roleFiltered.map(it => ({ id: it.id, title: it.title, assignedAgentIds: it.assignedAgentIds, assignedAgentId: it.assignedAgentId }))
+        assignedIds: roleFiltered.map(it => it.id)
       });
     }
     
@@ -174,17 +135,11 @@ const ItinerariesPage: React.FC = () => {
     }
   };
 
-  const handleDelete = async () => {
+  const handleDelete = () => {
     if (itineraryToDelete) {
-      try {
-        await deleteItinerary(itineraryToDelete.id);
-        addToast(`Itinerary "${itineraryToDelete.title}" deleted successfully.`, 'success');
-        handleCloseConfirm();
-      } catch (error) {
-        console.error('[ItinerariesPage] Error deleting itinerary:', error);
-        const errorMessage = error instanceof Error ? error.message : 'Failed to delete itinerary';
-        addToast(errorMessage, 'error');
-      }
+      deleteItinerary(itineraryToDelete.id);
+      addToast(`Itinerary "${itineraryToDelete.title}" deleted successfully.`, 'success');
+      handleCloseConfirm();
     }
   };
 
