@@ -50,31 +50,32 @@ export const env: EnvConfig = {
   firebase: {
     apiKey: getEnvVar(
       'VITE_FIREBASE_API_KEY',
-      import.meta.env.DEV ? 'AIzaSyAzA7MkNPrmBJ-V-4JrCFTmtlE_s76DKZg' : undefined
+      // Safe to ship in frontend bundles (Firebase API keys are not secrets)
+      'AIzaSyAzA7MkNPrmBJ-V-4JrCFTmtlE_s76DKZg'
     ),
     authDomain: getEnvVar(
       'VITE_FIREBASE_AUTH_DOMAIN',
-      import.meta.env.DEV ? 'travelplans-web-b43c6.firebaseapp.com' : undefined
+      'travelplans-web-b43c6.firebaseapp.com'
     ),
     projectId: getEnvVar(
       'VITE_FIREBASE_PROJECT_ID',
-      import.meta.env.DEV ? 'travelplans-web-b43c6' : undefined
+      'travelplans-web-b43c6'
     ),
     storageBucket: getEnvVar(
       'VITE_FIREBASE_STORAGE_BUCKET',
-      import.meta.env.DEV ? 'travelplans-web-b43c6.firebasestorage.app' : undefined
+      'travelplans-web-b43c6.firebasestorage.app'
     ),
     messagingSenderId: getEnvVar(
       'VITE_FIREBASE_MESSAGING_SENDER_ID',
-      import.meta.env.DEV ? '329181501952' : undefined
+      '329181501952'
     ),
     appId: getEnvVar(
       'VITE_FIREBASE_APP_ID',
-      import.meta.env.DEV ? '1:329181501952:web:85f39e8b525d40244116e5' : undefined
+      '1:329181501952:web:85f39e8b525d40244116e5'
     ),
     measurementId: getEnvVar(
       'VITE_FIREBASE_MEASUREMENT_ID',
-      import.meta.env.DEV ? 'G-GVR2ZDNFYW' : undefined
+      'G-GVR2ZDNFYW'
     ),
   },
 };
